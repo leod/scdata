@@ -168,6 +168,11 @@ class SoundCloudCrawler:
             return False
 
         best_id = max(self.candidate_playlists.items(), key=lambda item: item[1])[0]
+
+        candidates = list(self.candidate_playlists.items())
+        playlist_id = random.choices(list(item[0] for item in candidates),
+                                     weights=list(item[1]+1 for item in candidates))[0]
+
         print(f'Playlist {best_id} with score {self.candidate_playlists[best_id]}')
 
         del self.candidate_playlists[best_id]

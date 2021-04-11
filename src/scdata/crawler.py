@@ -113,9 +113,13 @@ class SoundCloudCrawler:
         # degrade quality.
         #sum(int('license' in info) for track_info in info.get('tracks', []))
 
-    def add_candidate_playlist(self, info):
-        if info['id'] not in self.visited_playlists:
-            self.candidate_playlists[info['id']] = self.get_playlist_score(info)
+    def add_candidate_playlist(self, playlist_info):
+        if playlist_info['id'] not in self.visited_playlists:
+            self.candidate_playlists[playlist_info['id']] = self.get_playlist_score(playlist_info)
+
+            for track_info in playlist_info.get('tracks', []):
+                if self.is_track_okay(track_info):
+                    self.tracks[track_info['id']] = track_info
 
     async def add_candidate_playlist_url(self, soundcloud_url: str):
         info = await self.api.resolve(soundcloud_url) 
@@ -129,7 +133,7 @@ class SoundCloudCrawler:
         playlist_info = await self.api.playlist(playlist_id)
         track_scores = []
 
-        for track_info in playlist_info.get('tracks', []):
+        for track_info in playlist_info.get('tracks', [])[:50]:
             if track_info['id'] in self.visited_tracks:
                 continue
             self.visited_tracks.add(track_info['id'])
@@ -138,8 +142,6 @@ class SoundCloudCrawler:
                 track_info = await self.api.track(track_info['id'])
                 if not self.is_complete_track_info(track_info):
                     continue
-
-            #print(track_info['license'], track_info['likes_count'], track_info['playback_count'])
 
             if self.is_track_okay(track_info):
                 self.tracks[track_info['id']] = track_info
@@ -153,6 +155,13 @@ class SoundCloudCrawler:
         for track_info in track_scores[:10]:
             for playlist_info in await self.api.track_playlists(track_info[0]['id']):
                 self.add_candidate_playlist(playlist_info)
+
+        # Try to expand our tastes a bit
+        likers = await self.api.playlist_likers(playlist_id)
+        for liker in likers[:10]:
+            for likes in await self.api.user_likes(liker['id']):
+                if 'playlist' in likes:
+                    self.add_candidate_playlist(likes['playlist'])
 
     async def crawl_step(self):
         if not self.candidate_playlists:
@@ -168,8 +177,8 @@ class SoundCloudCrawler:
 
     async def crawl(self,
                     max_steps,
-                    print_info_steps=10,
-                    save_steps=100,
+                    print_info_steps=1,
+                    save_steps=10,
                     save_path=None):
         for step_num in range(max_steps):
             if save_path is not None and step_num % save_steps == 0:

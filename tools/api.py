@@ -14,15 +14,27 @@ async def main(config):
                             client_id=config['SC_CLIENT_ID'],
                             oauth_token=config['SC_OAUTH_TOKEN'])
 
-        print(await api.resolve('https://soundcloud.com/tydollasign/your-turn'))
-        print('')
-        print(await api.track(251164884))
-        print('')
-        print(json.dumps(await api.resolve('https://soundcloud.com/user727372658/sets/playlist'), indent=4))
+        info = await api.resolve('https://soundcloud.com/5_lin/hana-kotoba')
+        print('track info:', info['id'], info['kind'])
 
-        print(json.dumps(await api.playlist(37538805), indent=4))
-        print(json.dumps(await api.track(270666643), indent=4))
+        track = await api.track(info['id'])
+        print('track genre:', track['genre'])
+        print('track artwork:', track['artwork_url'])
 
+        likers = await api.track_likers(info['id'])
+        print('liker:', likers[0]['kind'], likers[0]['id'])
+
+        info = await api.resolve('https://soundcloud.com/user727372658')
+        print('user:', info['id'], info['kind'])
+
+        followings = await api.user_followings(info['id'])
+        print('following:', followings[0]['id'], followings[0]['kind'])
+
+        info = await api.resolve('https://soundcloud.com/digitalstreams/sets/newtracks')
+        print('set:', info['id'], info['kind'])
+
+
+        print(json.dumps(info, indent=4))
 
 if __name__ == '__main__':
     config = dotenv.dotenv_values('.env')

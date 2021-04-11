@@ -22,7 +22,7 @@ class SoundCloudAPI:
         self.oauth_token = oauth_token
         self.server = server
 
-    async def get(self, resource: str, args: Dict[str, str] = {}):
+    async def get(self, resource: str, args: Dict[str, str] = {}, json=True):
         args = {'client_id': self.client_id, **args}
         url_args = '&'.join(f'{key}={quote(value)}' for key, value in args.items())
         url = f'{self.server}/{resource}?{url_args}'
@@ -37,6 +37,9 @@ class SoundCloudAPI:
     async def track(self, track_id: int):
         return await self.get(f'tracks/{track_id}')
 
+    async def track_likers(self, track_id: int):
+        return (await self.get(f'tracks/{track_id}/likers'))['collection']
+
     async def playlist(self, playlist_id: int):
         return await self.get(f'playlists/{playlist_id}')
 
@@ -44,4 +47,10 @@ class SoundCloudAPI:
         return await self.get(f'users/{user_id}')
 
     async def user_followings(self, user_id: int):
-        return await self.get(f'users/{user_id}/followings')
+        return (await self.get(f'users/{user_id}/followings'))['collection']
+
+    async def user_followers(self, user_id: int):
+        return (await self.get(f'users/{user_id}/followers'))['collection']
+
+    async def user_likes(self, user_id: int):
+        return (await self.get(f'users/{user_id}/likes'))['collection']

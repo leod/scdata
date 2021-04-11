@@ -14,8 +14,8 @@ async def main(config):
         crawler = SoundCloudCrawler(api)
         #crawler.load_state('crawler_state.json')
 
-        await crawler.add_candidate_url('https://soundcloud.com/digitalstreams/sets/newtracks')
-        await crawler.crawl(max_steps=10000,
+        await crawler.add_candidate_playlist_url('https://soundcloud.com/digitalstreams/sets/newtracks')
+        await crawler.crawl(max_steps=10,
                             save_path='crawler_state.json')
 
 if __name__ == '__main__':

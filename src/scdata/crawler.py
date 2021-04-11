@@ -2,43 +2,57 @@ from typing import Dict
 import random
 import json
 from collections import Counter
+import heapq
 
 import aiohttp
 import aiohttp.web
 
 from scdata import SoundCloudAPI
 
-KINDS = ['user', 'track', 'playlist']
-KIND_PROBS = {'user': 1.0/3.0, 'track': 1.0/3.0, 'playlist': 1.0/3.0}
 
 class SoundCloudCrawler:
     def __init__(self,
                  api: SoundCloudAPI,
-                 kind_probs: Dict[str, float] = KIND_PROBS,
                  max_candidates: int = 100000,
                  min_track_likes: int = 30,
                  min_track_plays: int = 200):
         self.api = api
-        self.kind_probs = kind_probs
         self.max_candidates = max_candidates
         self.min_track_likes = min_track_likes
         self.min_track_plays = min_track_plays
 
-        self.visited = {kind: set() for kind in KINDS}
-        self.candidates = {kind: {} for kind in KINDS}
+        self.visited_tracks = set()
+        self.visited_playlists = set()
+
+        self.candidate_playlists = {}
 
         self.tracks = {}
 
-    def is_track_okay(self, track):
-        # TODO: Check that track license is permissive enough
+    def save_state(self, path):
+        state = {
+            'max_candidates': self.max_candidates,
+            'min_track_likes': self.min_track_likes,
+            'min_track_plays': self.min_track_plays,
+            'visited_tracks': list(self.visited_tracks),
+            'visited_playlists': list(self.visited_playlists),
+            'candidate_playlists': self.candidate_playlists,
+            'tracks': self.tracks,
+        }                 
 
-        if track['likes_count'] is not None and track['likes_count'] >= self.min_track_likes:
-            return True
-        if track['playback_count'] is not None and track['playback_count'] >= self.min_track_plays:
-            return True
+        with open(path, 'w') as f:
+            json.dump(state, f, indent=4)
 
-        # Track is not popular enough
-        return False
+    def load_state(self, path):
+        with open(path) as f:
+            state = json.load(f)
+
+        self.max_candidates = state['max_candidates']
+        self.min_track_likes = state['min_track_likes']
+        self.min_track_plays = state['min_track_plays']
+        self.visited_tracks = set(state['visited_tracks'])
+        self.visited_playlists = set(state['visited_playlists'])
+        self.candidate_playlists = state['candidate_playlists']
+        self.tracks = state['tracks']
 
     def is_complete_track_info(self, info):
         # Some info may be incomplete, e.g. the playlist.tracks infos are complete only for the
@@ -52,26 +66,20 @@ class SoundCloudCrawler:
                          'media']
         return all(key in info for key in required_keys)
 
-    def add_candidate(self, info):
-        if info['kind'] not in self.visited:
-            return
-        if info['id'] in self.visited[info['kind']]:
-            return
-
-        self.candidates[info['kind']][info['id']] = info
-
-        # If we have complete track info, we can add it immediately (rather than later on if
-        # visiting it)
-        if info['kind'] == 'track':
-            if self.is_complete_track_info(info) and self.is_track_okay(info):
-                self.tracks[info['id']] = info
-
-    def add_candidates(self, infos):
-        for info in infos:
-            self.add_candidate(info)
-
     def is_free(self, license):
         return license != 'all-rights-reserved'
+
+    def is_track_okay(self, track):
+        if not self.is_complete_track_info(track):
+            return False
+        #if not self.is_free(track['license'])
+            #return False
+        if track['likes_count'] is None or track['likes_count'] < self.min_track_likes:
+            return False
+        if track['playback_count'] is None or track['playback_count'] < self.min_track_plays:
+            return False
+
+        return True
 
     def print_info(self):
         genres = Counter(info['genre'] for info in self.tracks.values())
@@ -82,103 +90,81 @@ class SoundCloudCrawler:
                          for info in self.tracks.values())
 
         print('==============================================')
-        for kind, candidates in self.candidates.items():
-            print(f'#candidates_{kind}={len(candidates)}')
-
-        for kind, visited in self.visited.items():
-            print(f'#visited_{kind}={len(visited)}')
-
+        print(f'#visited_tracks={len(self.visited_tracks)}')
+        print(f'#visited_playlists={len(self.visited_playlists)}')
+        print(f'#candidate_playlists={len(self.candidate_playlists)}')
         print(f'#tracks={len(self.tracks)}')
-        print(f'#tracks_free={free_count} ({free_count/len(self.tracks)*100:.2f}%)')
+        if len(self.tracks) > 0:
+            print(f'#tracks_free={free_count} ({free_count/len(self.tracks)*100:.2f}%)')
         print(f'genres={genres.most_common()[:10]}')
         print(f'genres_free={genres_free.most_common()[:10]}')
         print(f'licenses={licenses.most_common()[:10]}')
+        print('==============================================')
 
-    def save_state(self, path):
-        state = {
-            'kind_probs': self.kind_probs,
-            'max_candidates': self.max_candidates,
-            'min_track_likes': self.min_track_likes,
-            'min_track_plays': self.min_track_plays,
-            'visited': {kind: list(visited) for kind, visited in self.visited.items()},
-            'candidates': self.candidates,
-            'tracks': self.tracks,
-        }                 
+    def get_track_score(self, info):
+        return int('license' in info and self.is_free(info['license'])) 
 
-        with open(path, 'w') as f:
-            json.dump(state, f, indent=4)
+    def get_playlist_score(self, info):
+        if not info.get('tracks', []):
+            return 0.0
+        return sum(self.get_track_score(track_info) for track_info in info.get('tracks', []))
 
-    def load_state(self, path):
-        with open(path) as f:
-            state = json.load(f)
+        # Not sure if I want to normalize. Having long playlists helps getting more hits, but might
+        # degrade quality.
+        #sum(int('license' in info) for track_info in info.get('tracks', []))
 
-        self.kind_probs = state['kind_probs']
-        self.max_candidates = state['max_candidates']
-        self.min_track_likes = state['min_track_likes']
-        self.min_track_plays = state['min_track_plays']
-        self.visited = {kind: set(visited) for kind, visited in state['visited'].items()}
-        self.candidates = state['candidates']
-        self.tracks = state['tracks']
+    def add_candidate_playlist(self, info):
+        if info['id'] not in self.visited_playlists:
+            self.candidate_playlists[info['id']] = self.get_playlist_score(info)
 
-    async def add_candidate_url(self, soundcloud_url: str):
+    async def add_candidate_playlist_url(self, soundcloud_url: str):
         info = await self.api.resolve(soundcloud_url) 
-        self.add_candidate(info)
+        self.add_candidate_playlist(info)
 
-    async def visit(self, info):
-        self.visited[info['kind']].add(info['id'])
+    async def visit_playlist(self, playlist_id):
+        if playlist_id in self.visited_playlists:
+            return
+        self.visited_playlists.add(playlist_id)
 
-        if info['kind'] == 'user':
-            await self.visit_user(info)
-        elif info['kind'] == 'track':
-            await self.visit_track(info)
-        elif info['kind'] == 'playlist':
-            await self.visit_playlist(info)
-        else: # Ignore
-            ...
+        playlist_info = await self.api.playlist(playlist_id)
+        track_scores = []
 
-    async def visit_track(self, info):
-        if not self.is_complete_track_info(info):
-            info = await self.api.track(info['id'])
+        for track_info in playlist_info.get('tracks', []):
+            if track_info['id'] in self.visited_tracks:
+                continue
+            self.visited_tracks.add(track_info['id'])
 
-        if self.is_track_okay(info):
-            self.tracks[info['id']] = info
+            if not self.is_complete_track_info(track_info):
+                track_info = await self.api.track(track_info['id'])
+                if not self.is_complete_track_info(track_info):
+                    continue
 
-        self.add_candidates(await self.api.track_likers(info['id']))
+            #print(track_info['license'], track_info['likes_count'], track_info['playback_count'])
 
-    async def visit_user(self, info):
-        for like in await self.api.user_likes(info['id']):
-            if 'track' in like:
-                self.add_candidate(like['track'])
-            if 'playlist' in like:
-                # Not sure if this case ever occurs
-                self.add_candidate(like['playlist'])
+            if self.is_track_okay(track_info):
+                self.tracks[track_info['id']] = track_info
 
-        self.add_candidates(await self.api.user_followings(info['id']))
-        self.add_candidates(await self.api.user_followers(info['id']))
-        self.add_candidates(await self.api.user_playlists(info['id']))
+            track_score = self.get_track_score(track_info)
+            track_scores.append((track_info, track_score))
 
-    async def visit_playlist(self, info):
-        playlist = await self.api.playlist(info['id'])
-        if 'tracks' in playlist:
-            self.add_candidates(playlist['tracks'])
+        # For the most free tracks added, add the playlists that they are in as candidates.
+        # I've tried doing this for all new tracks, but it takes too long to do all the API calls.
+        track_scores.sort(key=lambda item: item[1], reverse=True)
+        for track_info in track_scores[:10]:
+            for playlist_info in await self.api.track_playlists(track_info[0]['id']):
+                self.add_candidate_playlist(playlist_info)
 
     async def crawl_step(self):
-        kind_choices = [
-            (kind, self.kind_probs[kind])
-            for kind, candidates in self.candidates.items()
-            if len(candidates) > 0
-        ]
-        if len(kind_choices) == 0:
-            return
+        if not self.candidate_playlists:
+            return False
 
-        kind = random.choices(list(kind for kind, _ in kind_choices),
-                                list(weight for _, weight in kind_choices))[0]
-        candidate = random.choice(list(self.candidates[kind].keys()))
+        best_id = max(self.candidate_playlists.items(), key=lambda item: item[1])[0]
+        print(f'Playlist {best_id} with score {self.candidate_playlists[best_id]}')
 
-        info = self.candidates[kind][candidate]
-        del self.candidates[kind][candidate]
+        del self.candidate_playlists[best_id]
+        await self.visit_playlist(best_id)
 
-        await self.visit(info)
+        return True
 
     async def crawl(self,
                     max_steps,
@@ -191,4 +177,5 @@ class SoundCloudCrawler:
             if print_info_steps > 0 and step_num % print_info_steps == 0:
                 self.print_info()
 
-            await self.crawl_step()
+            if not await self.crawl_step():
+                return

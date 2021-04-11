@@ -40,6 +40,9 @@ class SoundCloudAPI:
     async def track_likers(self, track_id: int):
         return (await self.get(f'tracks/{track_id}/likers'))['collection']
 
+    async def track_playlists(self, track_id: int):
+        return (await self.get(f'tracks/{track_id}/playlists_without_albums'))['collection']
+
     async def playlist(self, playlist_id: int):
         return await self.get(f'playlists/{playlist_id}')
 

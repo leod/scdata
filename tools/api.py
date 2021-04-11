@@ -1,3 +1,5 @@
+import json
+
 import asyncio
 import aiohttp
 
@@ -15,6 +17,11 @@ async def main(config):
         print(await api.resolve('https://soundcloud.com/tydollasign/your-turn'))
         print('')
         print(await api.track(251164884))
+        print('')
+        print(json.dumps(await api.resolve('https://soundcloud.com/user727372658/sets/playlist'), indent=4))
+
+        print(json.dumps(await api.playlist(37538805), indent=4))
+        print(json.dumps(await api.track(270666643), indent=4))
 
 
 if __name__ == '__main__':

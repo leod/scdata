@@ -1,3 +1,4 @@
+from typing import Dict
 import random
 import json
 
@@ -6,20 +7,26 @@ import aiohttp.web
 
 from scdata import SoundCloudAPI
 
+KINDS = ['user', 'track', 'playlist']
+KIND_PROBS = {'user': 1.0/3.0, 'track': 1.0/3.0, 'playlist': 1.0/3.0}
+
 class SoundCloudCrawler:
     def __init__(self,
                  api: SoundCloudAPI,
+                 kind_probs: Dict[str, float] = KIND_PROBS,
                  max_candidates: int = 100000,
                  min_track_likes: int = 100,
                  min_track_plays: int = 1000):
         self.api = api
+        self.kind_probs = kind_probs
         self.max_candidates = max_candidates
         self.min_track_likes = min_track_likes
         self.min_track_plays = min_track_plays
 
-        self.visited = set()
+        self.visited = {kind: set() for kind in KINDS}
+        self.candidates = {kind: {} for kind in KINDS}
+
         self.tracks = {}
-        self.candidates = {}
 
     def is_track_okay(self, track):
         # TODO: Check that track license is permissive enough
@@ -33,28 +40,25 @@ class SoundCloudCrawler:
         return False
 
     def add_candidate(self, info):
-        if 'id' not in info or 'kind' not in info:
-            print('Missing keys: ', info)
-
-        tag = (info['kind'], info['id'])
-        if tag in self.visited:
+        if info['kind'] not in self.visited:
             return
-        if info['kind'] in ['user', 'track', 'playlist']:
-            self.candidates[tag] = info
+        if info['id'] in self.visited[info['kind']]:
+            return
+
+        self.candidates[info['kind']][info['id']] = info
 
     def add_candidates(self, infos):
         for info in infos:
             self.add_candidate(info)
 
     def print_info(self):
-        print(f'#candidates={len(self.candidates)}')
-        for kind in ['user', 'track', 'playlist']:
-            count = len(list(c for c in self.candidates.keys() if c[0] == kind))
-            print(f'#candidates_{kind}={count}')
-        print(f'#visited={len(self.visited)}')
-        for kind in ['user', 'track', 'playlist']:
-            count = len(list(c for c in self.visited if c[0] == kind))
-            print(f'#visited_{kind}={count}')
+        print('==============================================')
+        for kind, candidates in self.candidates.items():
+            print(f'#candidates_{kind}={len(candidates)}')
+
+        for kind, visited in self.visited.items():
+            print(f'#visited_{kind}={len(visited)}')
+
         print(f'#tracks={len(self.tracks)}')
         print('==============================================')
 
@@ -63,8 +67,7 @@ class SoundCloudCrawler:
         self.add_candidate(info)
 
     async def visit(self, info):
-        tag = (info['kind'], info['id'])
-        self.visited.add(tag)
+        self.visited[info['kind']].add(info['id'])
 
         if info['kind'] == 'user':
             await self.visit_user(info)
@@ -72,8 +75,7 @@ class SoundCloudCrawler:
             await self.visit_track(info)
         elif info['kind'] == 'playlist':
             await self.visit_playlist(info)
-        else:
-            # Ignore
+        else: # Ignore
             ...
 
     async def visit_track(self, info):
@@ -105,15 +107,22 @@ class SoundCloudCrawler:
 
     async def crawl(self, max_steps):
         for step_num in range(max_steps):
-            if not self.candidates:
+            kind_choices = [
+                (kind, self.kind_probs[kind])
+                for kind, candidates in self.candidates.items()
+                if len(candidates) > 0
+            ]
+            if len(kind_choices) == 0:
                 return
 
             self.print_info()
 
-            candidate = random.choice(list(self.candidates.keys()))
+            kind = random.choices(list(kind for kind, _ in kind_choices),
+                                  list(weight for _, weight in kind_choices))[0]
+            candidate = random.choice(list(self.candidates[kind].keys()))
 
-            print(f'Candidate: {candidate}')
-            info = self.candidates[candidate]
-            del self.candidates[candidate]
+            print(f'Candidate: {kind}, {candidate}')
+            info = self.candidates[kind][candidate]
+            del self.candidates[kind][candidate]
 
             await self.visit(info)

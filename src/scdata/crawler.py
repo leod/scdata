@@ -152,7 +152,7 @@ class SoundCloudCrawler:
         # For the most free tracks added, add the playlists that they are in as candidates.
         # I've tried doing this for all new tracks, but it takes too long to do all the API calls.
         track_scores.sort(key=lambda item: item[1], reverse=True)
-        for track_info in track_scores[:10]:
+        for track_info in track_scores[:5]:
             for playlist_info in await self.api.track_playlists(track_info[0]['id']):
                 self.add_candidate_playlist(playlist_info)
 

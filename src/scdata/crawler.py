@@ -10,8 +10,47 @@ import aiohttp.web
 
 from scdata import SoundCloudAPI
 
+GENRES = set([
+    'classical',
+    'instrumental',
+    'ambient',
+    'rock',
+    'alternative rock',
+    'progressive rock',
+    'heavy metal',
+    'metal',
+    'metalcore',
+    'techno',
+    'idm',
+    'dubstep',
+    'rap',
+    'hip-hop',
+    'hip hop',
+    'hip-hop & rap',
+    'indie',
+    'pop',
+    'noise',
+    'cinematic',
+    'orchestral',
+    'piano',
+    'lofi',
+    'folk',
+    'experimental',
+    'electronic',
+    'jazz',
+    'blues',
+    'rnb',
+    'soul',
+    'r&b',
+    'r&b & soul',
+    'country',
+])
+
 
 def normalize_distr(weights: Dict[str, float]):
+    weights = dict(weights)
+    if 'others' not in weights:
+        weights['others'] = 0.0 if len(weights) else 1.0
     total = sum(weights.values())
     return {key: value/total for key, value in weights.items()}
 
@@ -24,18 +63,32 @@ def kl_div(p: Dict[str, float], q: Dict[str, float]):
 
     return s
 
-def bhattacharyya_dist(p: Dict[str, float], q: Dict[str, float]):
-    keys = set()
-    keys.update(p.keys())
-    keys.update(q.keys())
+def penalized_bhattacharyya_dist(p: Dict[str, float], q: Dict[str, float]):
+    p_keys = set(p.keys())
+    q_keys = set(q.keys())
+
+    keys = p_keys.union(q_keys)
 
     s = sum(math.sqrt(p.get(k, 0.0) * q.get(k, 0.0)) for k in keys)
-    return -math.log(s + 0.001)
+
+    # Penalize empty genre sets (now it's not bhattacharyya distance anymore)
+    #j = len(p_keys.intersection(q_keys)) / (len(keys) + 0.001)
+
+    return -math.log(s + 0.001) #* j
+
+
+def map_distr_genre(genre):
+    if genre is None or genre.lower() not in GENRES:
+        return 'others'
+    else:
+        return genre.lower()
 
 
 def playlist_distr(playlist_info):
-    genres = Counter(track_info['genre'] for track_info in playlist_info.get('tracks', [])
-                     if track_info.get('genre', '') != '')
+    genres = Counter(map_distr_genre(track_info['genre'])
+                     for track_info in playlist_info.get('tracks', [])
+                     if 'genre' in track_info)
+                     
     return normalize_distr(genres)
 
 
@@ -143,8 +196,8 @@ class SoundCloudCrawler:
         #sum(int('license' in info) for track_info in info.get('tracks', []))
 
     def get_free_tracks_distr(self):
-        genres_free = Counter(info['genre'] for info in self.tracks.values()
-                              if info.get('genre', '') != '' and self.is_free(info['license']))
+        genres_free = Counter(map_distr_genre(info.get('genre')) for info in self.tracks.values()
+                              if self.is_free(info['license']))
 
         return normalize_distr(genres_free)
 
@@ -171,7 +224,8 @@ class SoundCloudCrawler:
         playlist_info = await self.api.playlist(playlist_id)
         track_scores = []
 
-        print(playlist_distr(playlist_info), bhattacharyya_dist(self.get_free_tracks_distr(), playlist_distr(playlist_info)))
+        print(playlist_distr(playlist_info),
+              penalized_bhattacharyya_dist(self.get_free_tracks_distr(), playlist_distr(playlist_info)))
 
         for track_info in playlist_info.get('tracks', [])[:50]:
             if track_info['id'] in self.visited_tracks:
@@ -215,7 +269,7 @@ class SoundCloudCrawler:
         elif mode == 'genre':
             # Prefer playlists that have different genres from what we have so far
             free_tracks_distr = self.get_free_tracks_distr()
-            weights = list(bhattacharyya_dist(free_tracks_distr, item[1]['genres'])
+            weights = list(item[1]['free'] + penalized_bhattacharyya_dist(free_tracks_distr, item[1]['genres'])
                            for item in candidates)
 
         chosen_id = random.choices(list(item[0] for item in candidates), weights=weights)[0]

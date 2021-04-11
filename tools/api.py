@@ -5,7 +5,7 @@ import aiohttp
 
 import dotenv
 
-from scdata.api import SoundCloudAPI
+from scdata import SoundCloudAPI
 
 
 async def main(config):

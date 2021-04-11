@@ -4,8 +4,9 @@ import json
 import aiohttp
 import aiohttp.web
 
+from scdata import SoundCloudAPI
 
-class Crawler:
+class SoundCloudCrawler:
     def __init__(self,
                  api: SoundCloudAPI,
                  max_candidates: int = 100000,
@@ -16,7 +17,7 @@ class Crawler:
         self.min_track_likes = min_track_likes
         self.min_track_plays = min_track_plays
 
-        self.visited = {}
+        self.visited = set()
         self.tracks = {}
         self.candidates = {}
 
@@ -32,7 +33,10 @@ class Crawler:
         return False
 
     def add_candidate(self, info):
-        tag = (info['kind', info['id'])
+        if 'id' not in info or 'kind' not in info:
+            print('Missing keys: ', info)
+
+        tag = (info['kind'], info['id'])
         if tag in self.visited:
             return
         if info['kind'] in ['user', 'track', 'playlist']:
@@ -45,21 +49,21 @@ class Crawler:
     def print_info(self):
         print(f'#candidates={len(self.candidates)}')
         for kind in ['user', 'track', 'playlist']:
-            count = len(c for c in self.candidates.keys() if c[0] == kind)
+            count = len(list(c for c in self.candidates.keys() if c[0] == kind))
             print(f'#candidates_{kind}={count}')
         print(f'#visited={len(self.visited)}')
         for kind in ['user', 'track', 'playlist']:
-            count = len(c for c in self.visited if c[0] == kind)
+            count = len(list(c for c in self.visited if c[0] == kind))
             print(f'#visited_{kind}={count}')
         print(f'#tracks={len(self.tracks)}')
         print('==============================================')
 
     async def add_candidate_url(self, soundcloud_url: str):
         info = await self.api.resolve(soundcloud_url) 
-        await self.add(info)
+        self.add_candidate(info)
 
     async def visit(self, info):
-        tag = (info['kind', info['id'])
+        tag = (info['kind'], info['id'])
         self.visited.add(tag)
 
         if info['kind'] == 'user':
@@ -72,7 +76,7 @@ class Crawler:
             # Ignore
             ...
 
-    async def add_track(self, info):
+    async def visit_track(self, info):
         # Some info may be incomplete, e.g. the playlist.tracks infos are complete only for the
         # first couple of elements I think.
         if 'artwork_url' not in info or 'genre' not in info:
@@ -83,13 +87,20 @@ class Crawler:
 
         self.add_candidates(await self.api.track_likers(info['id']))
 
-    async def add_user(self, info: int):
-        self.add_candidates(await self.api.user_likes(info['id']))
+    async def visit_user(self, info):
+        for like in await self.api.user_likes(info['id']):
+            if 'track' in like:
+                self.add_candidate(like['track'])
+            if 'playlist' in like:
+                # Not sure if this case ever occurs
+                self.add_candidate(like['playlist'])
+
         self.add_candidates(await self.api.user_followings(info['id']))
         self.add_candidates(await self.api.user_followers(info['id']))
+        self.add_candidates(await self.api.user_playlists(info['id']))
 
-    async def add_playlist(self, playlist_id: int):
-        playlist = await self.api.playlist(playlist_id)
+    async def visit_playlist(self, info):
+        playlist = await self.api.playlist(info['id'])
         self.add_candidates(playlist['tracks'])
 
     async def crawl(self, max_steps):
@@ -97,9 +108,12 @@ class Crawler:
             if not self.candidates:
                 return
 
-            candidate = random.sample(list(self.candidates.keys()))
+            self.print_info()
+
+            candidate = random.choice(list(self.candidates.keys()))
 
             print(f'Candidate: {candidate}')
+            info = self.candidates[candidate]
             del self.candidates[candidate]
 
-            self.visit(candidate)
+            await self.visit(info)

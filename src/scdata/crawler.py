@@ -1,6 +1,7 @@
 from typing import Dict
 import random
 import json
+from collections import Counter
 
 import aiohttp
 import aiohttp.web
@@ -79,6 +80,12 @@ class SoundCloudCrawler:
 
         print(f'#tracks={len(self.tracks)}')
 
+        genres = Counter(info['genre'] for info in self.tracks.values())
+        print(f'genres={genres.most_common()[:10]}')
+
+        licenses = Counter(info['licenses'] for info in self.tracks.values())
+        print(f'genres={licenses.most_common()[:10]}')
+
     def save_state(self, path):
         state = {
             'kind_probs': self.kind_probs,
@@ -92,6 +99,18 @@ class SoundCloudCrawler:
 
         with open(path, 'w') as f:
             json.dump(state, f, indent=4)
+
+    def load_state(self, path):
+        with open(path) as f:
+            state = json.load(f)
+
+        self.kind_probs = state['kind_probs']
+        self.max_candidates = state['max_candidates']
+        self.min_track_likes = state['min_track_likes']
+        self.min_track_plays = state['min_track_plays']
+        self.visited = {kind: set(visited) for kind, visited in state['visited'].items()}
+        self.candidates = state['candidates']
+        self.tracks = state['tracks']
 
     async def add_candidate_url(self, soundcloud_url: str):
         info = await self.api.resolve(soundcloud_url) 
@@ -132,7 +151,8 @@ class SoundCloudCrawler:
 
     async def visit_playlist(self, info):
         playlist = await self.api.playlist(info['id'])
-        self.add_candidates(playlist['tracks'])
+        if 'tracks' in playlist:
+            self.add_candidates(playlist['tracks'])
 
     async def crawl_step(self):
         kind_choices = [

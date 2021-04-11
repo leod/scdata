@@ -13,7 +13,8 @@ async def main(config):
                             oauth_token=config['SC_OAUTH_TOKEN'])
         crawler = SoundCloudCrawler(api)
         await crawler.add_candidate_url('https://soundcloud.com/digitalstreams/sets/newtracks')
-        await crawler.crawl(max_steps=10)
+        await crawler.crawl(max_steps=100,
+                            save_path='crawler_state.json')
 
 if __name__ == '__main__':
     config = dotenv.dotenv_values('.env')

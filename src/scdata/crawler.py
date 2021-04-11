@@ -60,7 +60,20 @@ class SoundCloudCrawler:
             print(f'#visited_{kind}={len(visited)}')
 
         print(f'#tracks={len(self.tracks)}')
-        print('==============================================')
+
+    def save_state(self, path):
+        state = {
+            'kind_probs': self.kind_probs,
+            'max_candidates': self.max_candidates,
+            'min_track_likes': self.min_track_likes,
+            'min_track_plays': self.min_track_plays,
+            'visited': {kind: list(visited) for kind, visited in self.visited.items()},
+            'candidates': self.candidates,
+            'tracks': self.tracks,
+        }                 
+
+        with open(path, 'w') as f:
+            json.dump(state, f, indent=4)
 
     async def add_candidate_url(self, soundcloud_url: str):
         info = await self.api.resolve(soundcloud_url) 
@@ -105,24 +118,33 @@ class SoundCloudCrawler:
         playlist = await self.api.playlist(info['id'])
         self.add_candidates(playlist['tracks'])
 
-    async def crawl(self, max_steps):
+    async def crawl_step(self):
+        kind_choices = [
+            (kind, self.kind_probs[kind])
+            for kind, candidates in self.candidates.items()
+            if len(candidates) > 0
+        ]
+        if len(kind_choices) == 0:
+            return
+
+        kind = random.choices(list(kind for kind, _ in kind_choices),
+                                list(weight for _, weight in kind_choices))[0]
+        candidate = random.choice(list(self.candidates[kind].keys()))
+
+        info = self.candidates[kind][candidate]
+        del self.candidates[kind][candidate]
+
+        await self.visit(info)
+
+    async def crawl(self,
+                    max_steps,
+                    print_info_steps=10,
+                    save_steps=10,
+                    save_path=None):
         for step_num in range(max_steps):
-            kind_choices = [
-                (kind, self.kind_probs[kind])
-                for kind, candidates in self.candidates.items()
-                if len(candidates) > 0
-            ]
-            if len(kind_choices) == 0:
-                return
+            if save_path is not None and step_num % save_steps == 0:
+                self.save_state(save_path)
+            if print_info_steps > 0 and step_num % print_info_steps == 0:
+                self.print_info()
 
-            self.print_info()
-
-            kind = random.choices(list(kind for kind, _ in kind_choices),
-                                  list(weight for _, weight in kind_choices))[0]
-            candidate = random.choice(list(self.candidates[kind].keys()))
-
-            print(f'Candidate: {kind}, {candidate}')
-            info = self.candidates[kind][candidate]
-            del self.candidates[kind][candidate]
-
-            await self.visit(info)
+            await self.crawl_step()

@@ -3,11 +3,40 @@ import random
 import json
 from collections import Counter
 import heapq
+import math
 
 import aiohttp
 import aiohttp.web
 
 from scdata import SoundCloudAPI
+
+
+def normalize_distr(weights: Dict[str, float]):
+    total = sum(weights.values())
+    return {key: value/total for key, value in weights.items()}
+
+
+def kl_div(p: Dict[str, float], q: Dict[str, float]):
+    s = 0.0
+    for genre, prob_q in q.items():
+        if genre in p:
+            s += p[genre] * math.log(p[genre] / prob_q)
+
+    return s
+
+def bhattacharyya_dist(p: Dict[str, float], q: Dict[str, float]):
+    keys = set()
+    keys.update(p.keys())
+    keys.update(q.keys())
+
+    s = sum(math.sqrt(p.get(k, 0.0) * q.get(k, 0.0)) for k in keys)
+    return -math.log(s + 0.001)
+
+
+def playlist_distr(playlist_info):
+    genres = Counter(track_info['genre'] for track_info in playlist_info.get('tracks', [])
+                     if track_info.get('genre', '') != '')
+    return normalize_distr(genres)
 
 
 class SoundCloudCrawler:
@@ -113,9 +142,18 @@ class SoundCloudCrawler:
         # degrade quality.
         #sum(int('license' in info) for track_info in info.get('tracks', []))
 
+    def get_free_tracks_distr(self):
+        genres_free = Counter(info['genre'] for info in self.tracks.values()
+                              if info.get('genre', '') != '' and self.is_free(info['license']))
+
+        return normalize_distr(genres_free)
+
     def add_candidate_playlist(self, playlist_info):
         if playlist_info['id'] not in self.visited_playlists:
-            self.candidate_playlists[playlist_info['id']] = self.get_playlist_score(playlist_info)
+            self.candidate_playlists[playlist_info['id']] = {
+                'free': self.get_playlist_score(playlist_info),
+                'genres': playlist_distr(playlist_info),
+            }
 
             for track_info in playlist_info.get('tracks', []):
                 if self.is_track_okay(track_info):
@@ -132,6 +170,8 @@ class SoundCloudCrawler:
 
         playlist_info = await self.api.playlist(playlist_id)
         track_scores = []
+
+        print(playlist_distr(playlist_info), bhattacharyya_dist(self.get_free_tracks_distr(), playlist_distr(playlist_info)))
 
         for track_info in playlist_info.get('tracks', [])[:50]:
             if track_info['id'] in self.visited_tracks:
@@ -163,20 +203,27 @@ class SoundCloudCrawler:
                 if 'playlist' in likes:
                     self.add_candidate_playlist(likes['playlist'])
 
-    async def crawl_step(self):
+    async def crawl_step(self, mode):
         if not self.candidate_playlists:
             return False
 
-        best_id = max(self.candidate_playlists.items(), key=lambda item: item[1])[0]
-
         candidates = list(self.candidate_playlists.items())
-        playlist_id = random.choices(list(item[0] for item in candidates),
-                                     weights=list(item[1]+1 for item in candidates))[0]
 
-        print(f'Playlist {best_id} with score {self.candidate_playlists[best_id]}')
+        if mode == 'free':
+            # Prefer playlists that have more free licenses
+            weights = list(item[1]['free']**6 for item in candidates)
+        elif mode == 'genre':
+            # Prefer playlists that have different genres from what we have so far
+            free_tracks_distr = self.get_free_tracks_distr()
+            weights = list(bhattacharyya_dist(free_tracks_distr, item[1]['genres'])
+                           for item in candidates)
 
-        del self.candidate_playlists[best_id]
-        await self.visit_playlist(best_id)
+        chosen_id = random.choices(list(item[0] for item in candidates), weights=weights)[0]
+
+        print(f'Mode {mode}: Playlist {chosen_id}, free {self.candidate_playlists[chosen_id]["free"]}')
+
+        del self.candidate_playlists[chosen_id]
+        await self.visit_playlist(chosen_id)
 
         return True
 
@@ -186,10 +233,15 @@ class SoundCloudCrawler:
                     save_steps=10,
                     save_path=None):
         for step_num in range(max_steps):
-            if save_path is not None and step_num % save_steps == 0:
-                self.save_state(save_path)
-            if print_info_steps > 0 and step_num % print_info_steps == 0:
-                self.print_info()
+            try:
+                if save_path is not None and step_num % save_steps == 0:
+                    self.save_state(save_path)
+                if print_info_steps > 0 and step_num % print_info_steps == 0:
+                    self.print_info()
 
-            if not await self.crawl_step():
-                return
+                if not await self.crawl_step(mode='free'):
+                    return
+                if not await self.crawl_step(mode='genre'):
+                    return
+            except Exception as e:
+                print(f'Caught exception {e}')

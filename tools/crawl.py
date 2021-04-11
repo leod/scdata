@@ -12,7 +12,7 @@ async def main(config):
                             client_id=config['SC_CLIENT_ID'],
                             oauth_token=config['SC_OAUTH_TOKEN'])
         crawler = SoundCloudCrawler(api)
-        crawler.load_state('crawler_state.json')
+        #crawler.load_state('crawler_state.json')
 
         await crawler.add_candidate_url('https://soundcloud.com/digitalstreams/sets/newtracks')
         await crawler.crawl(max_steps=10000,

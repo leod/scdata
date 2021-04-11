@@ -16,8 +16,8 @@ class SoundCloudCrawler:
                  api: SoundCloudAPI,
                  kind_probs: Dict[str, float] = KIND_PROBS,
                  max_candidates: int = 100000,
-                 min_track_likes: int = 100,
-                 min_track_plays: int = 1000):
+                 min_track_likes: int = 30,
+                 min_track_plays: int = 200):
         self.api = api
         self.kind_probs = kind_probs
         self.max_candidates = max_candidates
@@ -70,12 +70,15 @@ class SoundCloudCrawler:
         for info in infos:
             self.add_candidate(info)
 
+    def is_free(self, license):
+        return license != 'all-rights-reserved'
+
     def print_info(self):
         genres = Counter(info['genre'] for info in self.tracks.values())
         genres_free = Counter(info['genre'] for info in self.tracks.values()
-                              if info['license'] != 'all-rights-reserved')
+                              if self.is_free(info['license']))
         licenses = Counter(info['license'] for info in self.tracks.values())
-        free_count = sum(1 if info['license'] != 'all-rights-reserved' else 0
+        free_count = sum(1 if self.is_free(info['license']) else 0
                          for info in self.tracks.values())
 
         print('==============================================')

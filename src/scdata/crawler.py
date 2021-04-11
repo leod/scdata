@@ -275,7 +275,7 @@ class SoundCloudCrawler:
         elif mode == 'genre':
             # Prefer playlists that have different genres from what we have so far
             free_tracks_distr = self.get_free_tracks_distr()
-            weights = list(item[1]['free']**0.5 + penalized_bhattacharyya_dist(free_tracks_distr, item[1]['genres'])
+            weights = list(math.exp(item[1]['free']**0.5 + penalized_bhattacharyya_dist(free_tracks_distr, item[1]['genres']))
                            for item in candidates)
 
         chosen_id = random.choices(list(item[0] for item in candidates), weights=weights)[0]

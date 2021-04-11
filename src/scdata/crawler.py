@@ -23,6 +23,7 @@ GENRES = set([
     'techno',
     'idm',
     'dubstep',
+    'house',
     'rap',
     'hip-hop',
     'hip hop',
@@ -180,6 +181,8 @@ class SoundCloudCrawler:
             print(f'#tracks_free={free_count} ({free_count/len(self.tracks)*100:.2f}%)')
         print(f'genres={genres.most_common()[:10]}')
         print(f'genres_free={genres_free.most_common()[:10]}')
+        print(f'genres_normalized={ {k:round(v,2) for k,v in self.get_tracks_distr().items()} }')
+        print(f'genres_free_normalized={ {k:round(v,2) for k,v in self.get_free_tracks_distr().items()} }')
         print(f'licenses={licenses.most_common()[:10]}')
         print('==============================================')
 
@@ -195,10 +198,13 @@ class SoundCloudCrawler:
         # degrade quality.
         #sum(int('license' in info) for track_info in info.get('tracks', []))
 
+    def get_tracks_distr(self):
+        genres_free = Counter(map_distr_genre(info.get('genre')) for info in self.tracks.values())
+        return normalize_distr(genres_free)
+
     def get_free_tracks_distr(self):
         genres_free = Counter(map_distr_genre(info.get('genre')) for info in self.tracks.values()
                               if self.is_free(info['license']))
-
         return normalize_distr(genres_free)
 
     def add_candidate_playlist(self, playlist_info):
@@ -269,7 +275,7 @@ class SoundCloudCrawler:
         elif mode == 'genre':
             # Prefer playlists that have different genres from what we have so far
             free_tracks_distr = self.get_free_tracks_distr()
-            weights = list(item[1]['free'] + penalized_bhattacharyya_dist(free_tracks_distr, item[1]['genres'])
+            weights = list(item[1]['free']**0.5 + penalized_bhattacharyya_dist(free_tracks_distr, item[1]['genres'])
                            for item in candidates)
 
         chosen_id = random.choices(list(item[0] for item in candidates), weights=weights)[0]

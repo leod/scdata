@@ -71,6 +71,13 @@ class SoundCloudCrawler:
             self.add_candidate(info)
 
     def print_info(self):
+        genres = Counter(info['genre'] for info in self.tracks.values())
+        genres_free = Counter(info['genre'] for info in self.tracks.values()
+                              if info['license'] != 'all-rights-reserved')
+        licenses = Counter(info['license'] for info in self.tracks.values())
+        free_count = sum(1 if info['license'] != 'all-rights-reserved' else 0
+                         for info in self.tracks.values())
+
         print('==============================================')
         for kind, candidates in self.candidates.items():
             print(f'#candidates_{kind}={len(candidates)}')
@@ -79,12 +86,10 @@ class SoundCloudCrawler:
             print(f'#visited_{kind}={len(visited)}')
 
         print(f'#tracks={len(self.tracks)}')
-
-        genres = Counter(info['genre'] for info in self.tracks.values())
+        print(f'#tracks_free={free_count} ({free_count/len(self.tracks)*100:.2f}%)')
         print(f'genres={genres.most_common()[:10]}')
-
-        licenses = Counter(info['licenses'] for info in self.tracks.values())
-        print(f'genres={licenses.most_common()[:10]}')
+        print(f'genres_free={genres_free.most_common()[:10]}')
+        print(f'licenses={licenses.most_common()[:10]}')
 
     def save_state(self, path):
         state = {
@@ -175,7 +180,7 @@ class SoundCloudCrawler:
     async def crawl(self,
                     max_steps,
                     print_info_steps=10,
-                    save_steps=10,
+                    save_steps=100,
                     save_path=None):
         for step_num in range(max_steps):
             if save_path is not None and step_num % save_steps == 0:

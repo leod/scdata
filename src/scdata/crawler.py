@@ -31,13 +31,25 @@ class SoundCloudCrawler:
     def is_track_okay(self, track):
         # TODO: Check that track license is permissive enough
 
-        if track['likes_count'] >= self.min_track_likes:
+        if track['likes_count'] is not None and track['likes_count'] >= self.min_track_likes:
             return True
-        if track['playback_count'] >= self.min_track_plays:
+        if track['playback_count'] is not None and track['playback_count'] >= self.min_track_plays:
             return True
 
         # Track is not popular enough
         return False
+
+    def is_complete_track_info(self, info):
+        # Some info may be incomplete, e.g. the playlist.tracks infos are complete only for the
+        # first couple of elements I think.
+        required_keys = ['artwork_url',
+                         'license',
+                         'likes_count',
+                         'playback_count',
+                         'title',
+                         'genre',
+                         'media']
+        return all(key in info for key in required_keys)
 
     def add_candidate(self, info):
         if info['kind'] not in self.visited:
@@ -46,6 +58,12 @@ class SoundCloudCrawler:
             return
 
         self.candidates[info['kind']][info['id']] = info
+
+        # If we have complete track info, we can add it immediately (rather than later on if
+        # visiting it)
+        if info['kind'] == 'track':
+            if self.is_complete_track_info(info) and self.is_track_okay(info):
+                self.tracks[info['id']] = info
 
     def add_candidates(self, infos):
         for info in infos:
@@ -92,9 +110,7 @@ class SoundCloudCrawler:
             ...
 
     async def visit_track(self, info):
-        # Some info may be incomplete, e.g. the playlist.tracks infos are complete only for the
-        # first couple of elements I think.
-        if 'artwork_url' not in info or 'genre' not in info:
+        if not self.is_complete_track_info(info):
             info = await self.api.track(info['id'])
 
         if self.is_track_okay(info):

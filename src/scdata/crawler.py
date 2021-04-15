@@ -4,6 +4,8 @@ import json
 from collections import Counter
 import heapq
 import math
+import traceback
+import numpy as np
 
 import aiohttp
 import aiohttp.web
@@ -64,7 +66,8 @@ def kl_div(p: Dict[str, float], q: Dict[str, float]):
 
     return s
 
-def penalized_bhattacharyya_dist(p: Dict[str, float], q: Dict[str, float]):
+
+def bhattacharyya_dist(p: Dict[str, float], q: Dict[str, float]):
     p_keys = set(p.keys())
     q_keys = set(q.keys())
 
@@ -72,10 +75,7 @@ def penalized_bhattacharyya_dist(p: Dict[str, float], q: Dict[str, float]):
 
     s = sum(math.sqrt(p.get(k, 0.001) * q.get(k, 0.001)) for k in keys)
 
-    # Penalize empty genre sets (now it's not bhattacharyya distance anymore)
-    #j = len(p_keys.intersection(q_keys)) / (len(keys) + 0.001)
-
-    return -math.log(s + 0.001) #* j
+    return -math.log(s + 0.001)
 
 
 def map_distr_genre(genre):
@@ -231,7 +231,7 @@ class SoundCloudCrawler:
         track_scores = []
 
         print(playlist_distr(playlist_info),
-              penalized_bhattacharyya_dist(self.get_free_tracks_distr(), playlist_distr(playlist_info)))
+              bhattacharyya_dist(self.get_free_tracks_distr(), playlist_distr(playlist_info)))
 
         for track_info in playlist_info.get('tracks', [])[:50]:
             if track_info['id'] in self.visited_tracks:
@@ -270,21 +270,42 @@ class SoundCloudCrawler:
         candidates = list(self.candidate_playlists.items())
 
         if mode == 'free':
-            # Prefer playlists that have more free licenses
-            weights = list(item[1]['free']**6 for item in candidates)
-        elif mode == 'genre':
-            # Prefer playlists that have different genres from what we have so far
-            tracks_distr = self.get_tracks_distr()
-            weights = list(math.exp(-100*int(item[1]['free']==0) + penalized_bhattacharyya_dist(tracks_distr, item[1]['genres']))
-                           for item in candidates)
+            # Prefer playlists that have more free licenses.
+            weights = list(candidate['free']**6 for _, candidate in candidates)
+        elif mode == 'genre_distr':
+            # Prefer playlists that have a different distribution of genres from what we have so
+            # far.
+            genre_distr = self.get_tracks_distr()
+            weights = list(math.exp(-100*int(candidate['free']==0) + \
+                                    bhattacharyya_dist(genre_distr, candidate['genres']))
+                           for _, candidate in candidates)
+        elif mode == 'genre_rank':
+            # Prefer playlists with genres that we have seen the least. I think this might be
+            # preferable to 'genre_distr'. At this point, we only have genre information of five
+            # tracks per playlist (this is the information that SoundCloud usually returns for
+            # playlist requests).
+            genre_distr = list(self.get_free_tracks_distr().items())
+            genre_distr.sort(key=lambda item: item[1])
+            genre_weights = {genre: 0.6**(rank+1) 
+                             for rank, (genre, _) in enumerate(genre_distr)}
+            weights = [
+                -100*int(candidate['free']==0) + \
+                np.prod(list(genre_weights[genre] ** prob
+                             for genre, prob in candidate['genres'].items()))
+                for _, candidate in candidates
+            ]
 
-        z = list(zip(candidates, weights))
-        z.sort(key=lambda item: item[1])
-        z = z[-50:]
-        candidates = [item[0] for item in z]
-        weights = [item[1] for item in z]
 
-        chosen_id = random.choices(list(item[0] for item in candidates), weights=weights)[0]
+        candidate_weights = list(zip(candidates, weights))
+        candidate_weights.sort(key=lambda pair: pair[1])
+
+        top_candidates = [pair[0] for pair in candidate_weights[-50:]]
+        top_weights = [pair[1] for pair in candidate_weights[-50:]]
+
+        for item, weight in candidate_weights[-50:]:
+            print(f'{weight}\t{item[1]["genres"]}')
+
+        chosen_id = random.choices(list(item[0] for item in top_candidates), weights=top_weights)[0]
 
         print(f'Mode {mode}: Playlist {chosen_id}, free {self.candidate_playlists[chosen_id]["free"]}')
 
@@ -305,9 +326,15 @@ class SoundCloudCrawler:
                 if print_info_steps > 0 and step_num % print_info_steps == 0:
                     self.print_info()
 
+                print(f'Starting step {step_num}')
+
                 if not await self.crawl_step(mode='free'):
                     return
-                if not await self.crawl_step(mode='genre'):
+                #if not await self.crawl_step(mode='genre_distr'):
+                    #return
+                if not await self.crawl_step(mode='genre_rank'):
                     return
             except Exception as e:
                 print(f'Caught exception {e}')
+                traceback.print_exc()
+

@@ -23,7 +23,7 @@ class SoundCloudAPI:
         self.server = server
         self.num_calls = 0
 
-    def get_num_calls():
+    def get_num_calls(self):
         return self.num_calls
 
     async def get(self, resource: str, args: Dict[str, str] = {}, json=True):

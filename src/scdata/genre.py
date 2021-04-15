@@ -1,4 +1,5 @@
 from typing import Dict
+from collections import Counter
 import math
 
 # Some somewhat arbitrary genre lists and mappings... there is no way to get this right. I try to
@@ -148,8 +149,8 @@ def bhattacharyya_dist(p: Dict[str, float], q: Dict[str, float]):
 
 
 def map_genre(genre):
-    if genre is None: #or genre.lower() not in GENRES:
-        return 'others'
+    if genre == '' or genre is None:
+        return 'unknown'
 
     genre = genre.lower()
     genre = GENRE_MAP.get(genre, genre)
@@ -158,3 +159,8 @@ def map_genre(genre):
         return 'ignore'
     else:
         return genre if genre in GENRES else 'others'
+
+
+def genre_distr(genres):
+    genres = Counter(map_genre(genre) for genre in genres)
+    return normalize_distr(genres)

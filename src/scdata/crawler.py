@@ -1,4 +1,3 @@
-from typing import Dict
 import random
 import json
 from collections import Counter
@@ -11,82 +10,15 @@ import aiohttp
 import aiohttp.web
 
 from scdata import SoundCloudAPI
-
-GENRES = set([
-    'classical',
-    'instrumental',
-    'ambient',
-    'rock',
-    'alternative rock',
-    'progressive rock',
-    'heavy metal',
-    'metal',
-    'metalcore',
-    'techno',
-    'idm',
-    'dubstep',
-    'house',
-    'rap',
-    'hip-hop',
-    'hip hop',
-    'hip-hop & rap',
-    'indie',
-    'pop',
-    'noise',
-    'cinematic',
-    'orchestral',
-    'piano',
-    'lofi',
-    'folk',
-    'experimental',
-    'electronic',
-    'jazz',
-    'blues',
-    'rnb',
-    'soul',
-    'r&b',
-    'r&b & soul',
-    'country',
-])
-
-
-def normalize_distr(weights: Dict[str, float]):
-    weights = dict(weights)
-    if 'others' not in weights:
-        weights['others'] = 0.0 if len(weights) else 1.0
-    total = sum(weights.values())
-    return {key: value/total for key, value in weights.items()}
-
-
-def kl_div(p: Dict[str, float], q: Dict[str, float]):
-    s = 0.0
-    for genre, prob_q in q.items():
-        if genre in p:
-            s += p[genre] * math.log(p[genre] / prob_q)
-
-    return s
-
-
-def bhattacharyya_dist(p: Dict[str, float], q: Dict[str, float]):
-    p_keys = set(p.keys())
-    q_keys = set(q.keys())
-
-    keys = p_keys.union(q_keys)
-
-    s = sum(math.sqrt(p.get(k, 0.001) * q.get(k, 0.001)) for k in keys)
-
-    return -math.log(s + 0.001)
-
-
-def map_distr_genre(genre):
-    if genre is None or genre.lower() not in GENRES:
-        return 'others'
-    else:
-        return genre.lower()
+from scdata.genre import (GENRES,
+                          IGNORE_GENRES,
+                          normalize_distr,
+                          bhattacharyya_dist,
+                          map_genre)
 
 
 def playlist_distr(playlist_info):
-    genres = Counter(map_distr_genre(track_info['genre'])
+    genres = Counter(map_genre(track_info['genre'])
                      for track_info in playlist_info.get('tracks', [])
                      if 'genre' in track_info)
                      
@@ -179,8 +111,8 @@ class SoundCloudCrawler:
         print(f'#tracks={len(self.tracks)}')
         if len(self.tracks) > 0:
             print(f'#tracks_free={free_count} ({free_count/len(self.tracks)*100:.2f}%)')
-        print(f'genres={genres.most_common()[:10]}')
-        print(f'genres_free={genres_free.most_common()[:30]}')
+        print(f'genres={genres.most_common()[:100]}')
+        print(f'genres_free={genres_free.most_common()[:100]}')
         print(f'genres_normalized={ {k:round(v,4) for k,v in self.get_tracks_distr().items()} }')
         print(f'genres_free_normalized={ {k:round(v,4) for k,v in self.get_free_tracks_distr().items()} }')
         print(f'licenses={licenses.most_common()[:10]}')
@@ -199,11 +131,11 @@ class SoundCloudCrawler:
         #sum(int('license' in info) for track_info in info.get('tracks', []))
 
     def get_tracks_distr(self):
-        genres_free = Counter(map_distr_genre(info.get('genre')) for info in self.tracks.values())
+        genres_free = Counter(map_genre(info.get('genre')) for info in self.tracks.values())
         return normalize_distr(genres_free)
 
     def get_free_tracks_distr(self):
-        genres_free = Counter(map_distr_genre(info.get('genre')) for info in self.tracks.values()
+        genres_free = Counter(map_genre(info.get('genre')) for info in self.tracks.values()
                               if self.is_free(info['license']))
         return normalize_distr(genres_free)
 
@@ -286,11 +218,11 @@ class SoundCloudCrawler:
             # playlist requests).
             genre_distr = list(self.get_free_tracks_distr().items())
             genre_distr.sort(key=lambda item: item[1])
-            genre_weights = {genre: 0.6**(rank+1) 
+            genre_weights = {genre: 0.6**(rank+1) if genre not in IGNORE_GENRES else 0.0
                              for rank, (genre, _) in enumerate(genre_distr)}
             weights = [
                 -100*int(candidate['free']==0) + \
-                np.prod(list(genre_weights[genre] ** prob
+                np.prod(list(genre_weights.get(genre, 1.0) ** prob
                              for genre, prob in candidate['genres'].items()))
                 for _, candidate in candidates
             ]

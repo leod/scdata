@@ -1,41 +1,121 @@
 from typing import Dict
 import math
 
+# Some somewhat arbitrary genre lists and mappings... there is no way to get this right. I try to
+# follow the frequently genre tags that are frequently used on SoundCloud.
+# 
+# Especially for electronic stuff this seems difficult. Some of the most frequent genres are
+# 'Techno' and 'Electronic', but other genres like 'Dance' occur frequently as well. Since some of
+# these are subgenres of each other, we can either group everything as 'Electronic', or accept the
+# fact that our list consists of genres from multiple (partially overlapping) levels of the
+# hierarchy. Since I think the former would be too coarse-grained for me, I choose the latter.
+
+# Try to unify some genres that at least refer to similar things. Also very subjective.
+GENRE_MAP = {
+    'blues': 'jazz & blues',
+    'chill': 'chillout',
+    'dance': 'dance & edm',
+    'dnb': 'drum & bass',
+    'drum and bass': 'drum & bass',
+    'edm': 'dance & edm',
+    'electro': 'electronic',
+    'electro house': 'house',
+    'electronica': 'electronic',
+    'eletrônica': 'electronic',
+    'folk': 'folk & singer-songwriter',
+    'hip hop': 'hip-hop & rap',
+    'hip-hop': 'hip-hop & rap',
+    'hiphop': 'hip-hop & rap',
+    'hip hop/rap': 'hip-hop & rap',
+    'hip-hop/rap': 'hip-hop & rap',
+    'hiphop/rap': 'hip-hop & rap',
+    'house music': 'house',
+    'jazz': 'jazz & blues',
+    'lofi hip hop': 'hip-hop & rap',
+    'melodic dubstep': 'dubstep',
+    'rap/hip hop': 'hip-hop & rap',
+    'rap/hip-hop': 'hip-hop & rap',
+    'rap/hiphop': 'hip-hop & rap',
+    'rap': 'hip-hop & rap',
+    'r&b': 'r&b & soul',
+    'rnb': 'r&b & soul',
+    'singer-songwriter': 'folk & singer-songwriter',
+    'soul': 'r&b & soul',
+    'triphop': 'trip-hop',
+}
+
+# Ignore some genres for this project.
+IGNORE_GENRES = set([
+    'cover',
+    'free download',
+    'freedownload',
+    'hoodinternet',
+    'music',
+    'podcast',
+    'public radio',
+    'remix',
+    'storytelling',
+    'talk',
+    'vlogmusic',
+])
+
 GENRES = set([
-    'classical',
-    'instrumental',
-    'ambient',
-    'rock',
+    'acoustic',
+    'alternative',
     'alternative rock',
-    'progressive rock',
+    'ambient',
+    'beats',
+    'chillout',
+    'chillstep',
+    'chiptune',
+    'cinematic',
+    'classical',
+    'country',
+    'dance & edm',
+    'dancehall',
+    'deep house',
+    'disco',
+    'downtempo',
+    'drum & bass',
+    'drumstep',
+    'dub',
+    'dubstep',
+    'electronic',
+    'experimental',
+    'folk',
+    'folk & singer-songwriter',
+    'funk',
+    'gospel',
     'heavy metal',
+    'hip-hop & rap',
+    'house',
+    'idm',
+    'indie',
+    'instrumental',
+    'jazz & blues',
+    'latin',
+    'lofi',
+    'mashup',
     'metal',
     'metalcore',
-    'techno',
-    'idm',
-    'dubstep',
-    'house',
-    'rap',
-    'hip-hop',
-    'hip hop',
-    'hip-hop & rap',
-    'indie',
-    'pop',
+    'minimal',
+    'nightcore',
     'noise',
-    'cinematic',
     'orchestral',
     'piano',
-    'lofi',
-    'folk',
-    'experimental',
-    'electronic',
-    'jazz',
-    'blues',
-    'rnb',
-    'soul',
-    'r&b',
+    'pop',
+    'progressive rock',
+    'psytrance',
     'r&b & soul',
-    'country',
+    'reggae',
+    'rock',
+    'soundtrack',
+    'synthwave',
+    'techno',
+    'trap',
+    'trip-hop',
+    'urban',
+    'world',
 ])
 
 
@@ -68,7 +148,13 @@ def bhattacharyya_dist(p: Dict[str, float], q: Dict[str, float]):
 
 
 def map_genre(genre):
-    if genre is None or genre.lower() not in GENRES:
+    if genre is None: #or genre.lower() not in GENRES:
         return 'others'
+
+    genre = genre.lower()
+    genre = GENRE_MAP.get(genre, genre)
+
+    if genre in IGNORE_GENRES:
+        return 'ignore'
     else:
-        return genre.lower()
+        return genre if genre in GENRES else 'others'

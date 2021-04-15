@@ -225,14 +225,16 @@ class SoundCloudCrawler:
             # playlist requests).
             tracks_genre_distr = list(self.get_free_tracks_genre_distr().items())
             tracks_genre_distr.sort(key=lambda item: item[1])
-            genre_weights = {genre: 0.6**(rank+1) if genre not in IGNORE_GENRES else 0.0
+            genre_weights = {genre: math.log(0.6**(rank+1)) if genre not in IGNORE_GENRES else 0.0
                              for rank, (genre, _) in enumerate(tracks_genre_distr)}
 
             weights = [
-                -100*int(candidate['freeness']==0) + \
-                np.prod(list(genre_weights.get(genre, 1.0) ** prob
-                             for genre, prob
-                             in genre_distr(candidate['genres']).items()))
+                math.exp(
+                    -100*int(candidate['freeness']==0) + \
+                    np.sum(list(prob * genre_weights.get(genre, 0.0)
+                                for genre, prob
+                                in genre_distr(candidate['genres']).items()))
+                )
                 for _, candidate in candidates
             ]
 

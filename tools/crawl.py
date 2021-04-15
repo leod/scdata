@@ -38,8 +38,8 @@ async def main(config):
         for url in urls:
             await crawler.add_candidate_playlist_url(url)
 
-        await crawler.crawl(max_steps=100001)
-                            #save_path='crawler_state.json')
+        await crawler.crawl(max_steps=100001,
+                            save_path='crawler_state.json')
 
 if __name__ == '__main__':
     config = dotenv.dotenv_values('.env')

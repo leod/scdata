@@ -3,7 +3,8 @@ from collections import Counter
 import math
 
 # Some somewhat arbitrary genre lists and mappings... there is no way to get this right. I try to
-# follow the frequently genre tags that are frequently used on SoundCloud.
+# follow the frequently genre tags that are frequently used on SoundCloud; some genres occur rarely,
+# so I merge them with the most fitting super-genre. 
 # 
 # Especially for electronic stuff this seems difficult. Some of the most frequent genres are
 # 'Techno' and 'Electronic', but other genres like 'Dance' occur frequently as well. Since some of
@@ -11,39 +12,45 @@ import math
 # fact that our list consists of genres from multiple (partially overlapping) levels of the
 # hierarchy. Since I think the former would be too coarse-grained for me, I choose the latter.
 
-# Try to unify some genres that at least refer to similar things. Also very subjective.
+# Try to unify some genres that at least refer to similar things. Also very subjective and noisy.
 GENRE_MAP = {
-    'blues': 'jazz & blues',
-    'chill': 'chillout',
-    'dance': 'dance & edm',
-    'dnb': 'drum & bass',
-    'drum and bass': 'drum & bass',
-    'edm': 'dance & edm',
-    'electro': 'electronic',
-    'electro house': 'house',
-    'electronica': 'electronic',
-    'eletrônica': 'electronic',
-    'folk': 'folk & singer-songwriter',
-    'hip hop': 'hip-hop & rap',
-    'hip-hop': 'hip-hop & rap',
-    'hiphop': 'hip-hop & rap',
-    'hip hop/rap': 'hip-hop & rap',
-    'hip-hop/rap': 'hip-hop & rap',
-    'hiphop/rap': 'hip-hop & rap',
-    'house music': 'house',
-    'jazz': 'jazz & blues',
-    'liquid d&b': 'drum & bass',
-    'lofi hip hop': 'hip-hop & rap',
-    'melodic dubstep': 'dubstep',
-    'rap/hip hop': 'hip-hop & rap',
-    'rap/hip-hop': 'hip-hop & rap',
-    'rap/hiphop': 'hip-hop & rap',
-    'rap': 'hip-hop & rap',
-    'r&b': 'r&b & soul',
-    'rnb': 'r&b & soul',
-    'singer-songwriter': 'folk & singer-songwriter',
-    'soul': 'r&b & soul',
-    'triphop': 'trip-hop',
+    'alternative': 'alternative rock', # alias?
+    'blues': 'jazz & blues', # rare, merge with super
+    'chill': 'chillout', # alias
+    'dance': 'dance & edm', # merge with super
+    'dnb': 'drum & bass', # alias
+    'drum and bass': 'drum & bass', # alias
+    'edm': 'dance & edm', # merge with super
+    'electro': 'electronic', # alias
+    'electro house': 'house', # alias
+    'electronica': 'electronic', # alias
+    'eletrônica': 'electronic', # alias
+    'folk': 'folk & singer-songwriter', # rare, merge with super
+    'heavy metal': 'metal', # very rare
+    'hip hop': 'hip-hop & rap', # alias
+    'hip-hop': 'hip-hop & rap', # alias
+    'hiphop': 'hip-hop & rap', # alias
+    'hip hop/rap': 'hip-hop & rap', # alias
+    'hip-hop/rap': 'hip-hop & rap', # alias
+    'hiphop/rap': 'hip-hop & rap', # alias
+    'house music': 'house', # alias
+    'idm': 'electronic', # very rare
+    'indie': 'indie rock', # alias?
+    'jazz': 'jazz & blues', # merge with super
+    'liquid d&b': 'drum & bass', # very rare
+    'lofi hip hop': 'hip-hop & rap', # rare
+    'melodic dubstep': 'dubstep', # rare
+    'psychedelic trance': 'psytrance', # alias
+    'progressive rock': 'rock', # very rare
+    'rap/hip hop': 'hip-hop & rap', # alias
+    'rap/hip-hop': 'hip-hop & rap', # alias
+    'rap/hiphop': 'hip-hop & rap', # alias
+    'rap': 'hip-hop & rap', # alias
+    'r&b': 'r&b & soul', # merge with super
+    'rnb': 'r&b & soul', # merge with super
+    'singer-songwriter': 'folk & singer-songwriter', # merge with super
+    'soul': 'r&b & soul', # merge with super
+    'triphop': 'trip-hop', # alias
 }
 
 # Ignore some genres for this project.
@@ -92,7 +99,7 @@ GENRES = set([
     'hip-hop & rap',
     'house',
     'idm',
-    'indie',
+    'indie rock',
     'instrumental',
     'jazz & blues',
     'latin',
@@ -106,7 +113,9 @@ GENRES = set([
     'orchestral',
     'piano',
     'pop',
+    'progressive house',
     'progressive rock',
+    'progressive trance',
     'psytrance',
     'r&b & soul',
     'reggae',
@@ -114,8 +123,10 @@ GENRES = set([
     'soundtrack',
     'synthwave',
     'techno',
+    'trance',
     'trap',
     'trip-hop',
+    'tropical house',
     'urban',
     'world',
 ])
@@ -154,6 +165,7 @@ def map_genre(genre):
         return 'unknown'
 
     genre = genre.lower()
+    genre = genre.strip()
     genre = GENRE_MAP.get(genre, genre)
 
     if genre in IGNORE_GENRES:

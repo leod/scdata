@@ -21,12 +21,18 @@ class SoundCloudAPI:
         self.client_id = client_id
         self.oauth_token = oauth_token
         self.server = server
+        self.num_calls = 0
+
+    def get_num_calls():
+        return self.num_calls
 
     async def get(self, resource: str, args: Dict[str, str] = {}, json=True):
         args = {'client_id': self.client_id, **args}
         url_args = '&'.join(f'{key}={quote(value)}' for key, value in args.items())
         url = f'{self.server}/{resource}?{url_args}'
         headers = {'Authorization': 'OAuth ' + self.oauth_token}
+
+        self.num_calls += 1
 
         async with self.session.get(url, headers=headers) as response:
             return await response.json()

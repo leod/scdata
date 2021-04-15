@@ -61,7 +61,6 @@ class SoundCloudCrawler:
         with open(path) as f:
             state = json.load(f)
 
-        self.max_candidates = state['max_candidates']
         self.min_track_likes = state['min_track_likes']
         self.min_track_plays = state['min_track_plays']
         self.visited_tracks = set(state['visited_tracks'])
@@ -115,6 +114,7 @@ class SoundCloudCrawler:
         other_perc = other_count / len(self.tracks) * 100
 
         print('=================================================================================')
+        print(f'#api_calls:           {self.api.get_num_calls()}')
         print(f'#visited_tracks:      {len(self.visited_tracks)}')
         print(f'#visited_playlists:   {len(self.visited_playlists)}')
         print(f'#visited_users:       {len(self.visited_users)}')

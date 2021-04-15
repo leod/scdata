@@ -36,6 +36,7 @@ class SoundCloudCrawler:
 
         self.visited_tracks = set()
         self.visited_playlists = set()
+        self.visited_users = set()
 
         self.candidate_playlists = {}
 
@@ -47,6 +48,7 @@ class SoundCloudCrawler:
             'min_track_plays': self.min_track_plays,
             'visited_tracks': list(self.visited_tracks),
             'visited_playlists': list(self.visited_playlists),
+            'visited_users': list(self.visited_users),
             'candidate_playlists': self.candidate_playlists,
             'tracks': self.tracks,
         }                 
@@ -63,6 +65,7 @@ class SoundCloudCrawler:
         self.min_track_plays = state['min_track_plays']
         self.visited_tracks = set(state['visited_tracks'])
         self.visited_playlists = set(state['visited_playlists'])
+        self.visited_users = set(state['visited_users'])
         self.candidate_playlists = state['candidate_playlists']
         self.tracks = state['tracks']
 
@@ -106,12 +109,13 @@ class SoundCloudCrawler:
         print('==============================================')
         print(f'#visited_tracks={len(self.visited_tracks)}')
         print(f'#visited_playlists={len(self.visited_playlists)}')
+        print(f'#visited_users={len(self.visited_users)}')
         print(f'#candidate_playlists={len(self.candidate_playlists)}')
         print(f'#tracks={len(self.tracks)}')
         if len(self.tracks) > 0:
             print(f'#tracks_free={free_count} ({free_count/len(self.tracks)*100:.2f}%)')
-        print(f'genres={genres.most_common()[:100]}')
-        print(f'genres_free={genres_free.most_common()[:100]}')
+        #print(f'genres={genres.most_common()[:100]}')
+        #print(f'genres_free={genres_free.most_common()[:100]}')
         print(f'genres_normalized={ {k:round(v,4) for k,v in self.get_tracks_genre_distr().items()} }')
         print(f'genres_free_normalized={ {k:round(v,4) for k,v in self.get_free_tracks_genre_distr().items()} }')
         print(f'licenses={licenses.most_common()[:10]}')
@@ -189,6 +193,9 @@ class SoundCloudCrawler:
         # Try to expand our tastes a bit:
         likers = await self.api.playlist_likers(playlist_id)
         for liker in likers[:10]:
+            if liker['id'] in self.visited_users:
+                continue
+            self.visited_users.add(liker['id'])
             for likes in await self.api.user_likes(liker['id']):
                 if 'playlist' in likes:
                     self.add_candidate_playlist(likes['playlist'])

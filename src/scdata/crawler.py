@@ -15,7 +15,8 @@ from scdata.genre import (GENRES,
                           normalize_distr,
                           bhattacharyya_dist,
                           map_genre,
-                          genre_distr)
+                          genre_distr,
+                          pp_distr)
 
 
 def playlist_distr(playlist_info):
@@ -105,21 +106,25 @@ class SoundCloudCrawler:
         licenses = Counter(info['license'] for info in self.tracks.values())
         free_count = sum(1 if self.is_free(info['license']) else 0
                          for info in self.tracks.values())
+        free_perc = free_count / len(self.tracks) * 100
 
-        print('==============================================')
-        print(f'#visited_tracks={len(self.visited_tracks)}')
-        print(f'#visited_playlists={len(self.visited_playlists)}')
-        print(f'#visited_users={len(self.visited_users)}')
-        print(f'#candidate_playlists={len(self.candidate_playlists)}')
-        print(f'#tracks={len(self.tracks)}')
+        genres = pp_distr(self.get_tracks_genre_distr())
+        genres_free = pp_distr(self.get_free_tracks_genre_distr())
+
+        print('=================================================================================')
+        print(f'#visited_tracks:      {len(self.visited_tracks)}')
+        print(f'#visited_playlists:   {len(self.visited_playlists)}')
+        print(f'#visited_users:       {len(self.visited_users)}')
+        print(f'#candidate_playlists: {len(self.candidate_playlists)}')
+        print(f'#tracks:              {len(self.tracks)}')
         if len(self.tracks) > 0:
-            print(f'#tracks_free={free_count} ({free_count/len(self.tracks)*100:.2f}%)')
+            print(f'#tracks_free:         {free_count} ({free_perc:.2f}%)')
+        print(f'genres:               {genres}')
+        print(f'genres_free:          {genres_free}')
+        print(f'licenses:             {licenses.most_common()[:10]}')
         #print(f'genres={genres.most_common()[:100]}')
         #print(f'genres_free={genres_free.most_common()[:100]}')
-        print(f'genres_normalized={ {k:round(v,4) for k,v in self.get_tracks_genre_distr().items()} }')
-        print(f'genres_free_normalized={ {k:round(v,4) for k,v in self.get_free_tracks_genre_distr().items()} }')
-        print(f'licenses={licenses.most_common()[:10]}')
-        print('==============================================')
+        print('=================================================================================')
 
     def get_track_freeness(self, info):
         return int('license' in info and self.is_free(info['license'])) 
@@ -140,7 +145,7 @@ class SoundCloudCrawler:
         if playlist_info['id'] in self.visited_playlists:
             return
 
-        genres = [track['genre'] for track in playlist_info.get('tracks')
+        genres = [track['genre'] for track in playlist_info.get('tracks', [])
                   if track.get('genre') is not None]
 
         self.candidate_playlists[playlist_info['id']] = {
@@ -165,7 +170,7 @@ class SoundCloudCrawler:
         playlist_info = await self.api.playlist(playlist_id)
         track_scores = []
 
-        print(playlist_distr(playlist_info))
+        print('    genres: ' + pp_distr(playlist_distr(playlist_info)))
 
         for track_info in playlist_info.get('tracks', [])[:50]:
             if track_info['id'] in self.visited_tracks:
@@ -200,9 +205,9 @@ class SoundCloudCrawler:
                 if 'playlist' in likes:
                     self.add_candidate_playlist(likes['playlist'])
 
-    async def crawl_step(self, mode):
+    def choose_playlist_id(self, mode):
         if not self.candidate_playlists:
-            return False
+            return None
 
         candidates = list(self.candidate_playlists.items())
 
@@ -228,21 +233,34 @@ class SoundCloudCrawler:
             ]
 
 
-        candidate_weights = list(zip(candidates, weights))
-        candidate_weights.sort(key=lambda pair: pair[1])
+        candidates_weights = list(zip(candidates, weights))
+        candidates_weights.sort(key=lambda pair: pair[1])
 
-        top_candidates = [pair[0] for pair in candidate_weights[-50:]]
-        top_weights = [pair[1] for pair in candidate_weights[-50:]]
+        candidates_weights = candidates_weights[-50:]
+        weights = [pair[1] for pair in candidates_weights]
 
         #for item, weight in candidate_weights[-50:]:
             #print(f'{weight}\t{genre_distr(item[1]["genres"])}')
 
-        chosen_id = random.choices(list(item[0] for item in top_candidates), weights=top_weights)[0]
+        #choices = list(item[0] for item in top_candidates)
+        choice = random.choices(candidates_weights, weights=weights)[0]
+        choice_id = choice[0][0]
+        choice_value = choice[0][1]
+        choice_weight = choice[1]
 
-        print(f'Mode {mode}: Playlist {chosen_id}, free {self.candidate_playlists[chosen_id]["freeness"]}')
+        print(f'    playlist_id: {choice_id}, '
+              f'freeness: {choice_value["freeness"]}, '
+              f'weight: {choice_weight}')
 
-        del self.candidate_playlists[chosen_id]
-        await self.visit_playlist(chosen_id)
+        return choice_id
+
+    async def crawl_step(self, mode):
+        playlist_id = self.choose_playlist_id(mode)
+        if playlist_id is None:
+            return False
+
+        del self.candidate_playlists[playlist_id]
+        await self.visit_playlist(playlist_id)
 
         return True
 
@@ -258,11 +276,11 @@ class SoundCloudCrawler:
                 if print_info_steps > 0 and step_num % print_info_steps == 0:
                     self.print_info()
 
-                print(f'Starting step {step_num}, mode="freeness"')
+                print(f'step {step_num}, mode="freeness"')
                 if not await self.crawl_step(mode='freeness'):
                     return
 
-                print(f'Starting step {step_num}, mode="genre_rank"')
+                print(f'step {step_num}, mode="genre_rank"')
                 if not await self.crawl_step(mode='genre_rank'):
                     return
             except Exception as e:

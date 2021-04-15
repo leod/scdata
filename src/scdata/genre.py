@@ -164,3 +164,7 @@ def map_genre(genre):
 def genre_distr(genres):
     genres = Counter(map_genre(genre) for genre in genres)
     return normalize_distr(genres)
+
+
+def pp_distr(distr):
+    return str({k: round(v, 4) for k, v in distr.items()})

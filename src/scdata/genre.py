@@ -32,6 +32,7 @@ GENRE_MAP = {
     'hiphop/rap': 'hip-hop & rap',
     'house music': 'house',
     'jazz': 'jazz & blues',
+    'liquid d&b': 'drum & bass',
     'lofi hip hop': 'hip-hop & rap',
     'melodic dubstep': 'dubstep',
     'rap/hip hop': 'hip-hop & rap',
@@ -167,4 +168,6 @@ def genre_distr(genres):
 
 
 def pp_distr(distr):
-    return str({k: round(v, 4) for k, v in distr.items()})
+    distr = list(distr.items())
+    distr.sort(key=lambda item: item[1], reverse=True)
+    return ', '.join(f'{genre} {prob*100:.2f}%' for genre, prob in distr)

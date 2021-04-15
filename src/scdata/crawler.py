@@ -100,16 +100,19 @@ class SoundCloudCrawler:
         return True
 
     def print_info(self):
-        genres = Counter(info['genre'] for info in self.tracks.values())
-        genres_free = Counter(info['genre'] for info in self.tracks.values()
-                              if self.is_free(info['license']))
         licenses = Counter(info['license'] for info in self.tracks.values())
         free_count = sum(1 if self.is_free(info['license']) else 0
                          for info in self.tracks.values())
         free_perc = free_count / len(self.tracks) * 100
 
-        genres = pp_distr(self.get_tracks_genre_distr())
-        genres_free = pp_distr(self.get_free_tracks_genre_distr())
+        ignore_genres = Counter(track.get('genre') for track in self.tracks.values()
+                                if map_genre(track.get('genre')) == 'ignore')
+        other_genres = Counter(track.get('genre') for track in self.tracks.values()
+                               if map_genre(track.get('genre')) == 'others')
+        ignore_count = sum(ignore_genres.values())
+        other_count = sum(other_genres.values())
+        ignore_perc = ignore_count / len(self.tracks) * 100
+        other_perc = other_count / len(self.tracks) * 100
 
         print('=================================================================================')
         print(f'#visited_tracks:      {len(self.visited_tracks)}')
@@ -117,13 +120,14 @@ class SoundCloudCrawler:
         print(f'#visited_users:       {len(self.visited_users)}')
         print(f'#candidate_playlists: {len(self.candidate_playlists)}')
         print(f'#tracks:              {len(self.tracks)}')
-        if len(self.tracks) > 0:
-            print(f'#tracks_free:         {free_count} ({free_perc:.2f}%)')
-        print(f'genres:               {genres}')
-        print(f'genres_free:          {genres_free}')
+        print(f'    #free:            {free_count} ({free_perc:.2f}%)')
+        print(f'    #ignore_genre:    {ignore_count} ({ignore_perc:.2f}%)')
+        print(f'    #other_genre:     {other_count} ({other_perc:.2f}%)')
+        print(f'genres:               {pp_distr(self.get_tracks_genre_distr())}')
+        print(f'genres_free:          {pp_distr(self.get_free_tracks_genre_distr())}')
+        print(f'ignore_genres:        {ignore_genres.most_common()[:10]}')
+        print(f'other_genres:         {other_genres.most_common()[:10]}')
         print(f'licenses:             {licenses.most_common()[:10]}')
-        #print(f'genres={genres.most_common()[:100]}')
-        #print(f'genres_free={genres_free.most_common()[:100]}')
         print('=================================================================================')
 
     def get_track_freeness(self, info):

@@ -12,10 +12,13 @@ async def main(config):
                             client_id=config['SC_CLIENT_ID'],
                             oauth_token=config['SC_OAUTH_TOKEN'])
         crawler = SoundCloudCrawler(api)
-        #crawler.load_state('crawler_state.json')
+        crawler.load_state('crawler_state.json')
 
         urls = [
-            'https://soundcloud.com/digitalstreams/sets/newtracks',
+            #'https://soundcloud.com/digitalstreams/sets/newtracks',
+            #'https://soundcloud.com/royaltyfreemusic-nocopyrightmusic/sets/creative-commons-music',
+            'https://soundcloud.com/tilohensel/sets/creative-commons-music',
+
             #'https://soundcloud.com/agamidae/sets/instrumental',
             #'https://soundcloud.com/digitalstreams/sets/newtracks',
             #'https://soundcloud.com/yourparadis/sets/jazz-hip-4-1',
@@ -35,7 +38,7 @@ async def main(config):
         for url in urls:
             await crawler.add_candidate_playlist_url(url)
 
-        await crawler.crawl(max_steps=101,
+        await crawler.crawl(max_steps=100001,
                             save_path='crawler_state.json')
 
 if __name__ == '__main__':

@@ -70,7 +70,7 @@ def penalized_bhattacharyya_dist(p: Dict[str, float], q: Dict[str, float]):
 
     keys = p_keys.union(q_keys)
 
-    s = sum(math.sqrt(p.get(k, 0.0) * q.get(k, 0.0)) for k in keys)
+    s = sum(math.sqrt(p.get(k, 0.001) * q.get(k, 0.001)) for k in keys)
 
     # Penalize empty genre sets (now it's not bhattacharyya distance anymore)
     #j = len(p_keys.intersection(q_keys)) / (len(keys) + 0.001)
@@ -180,9 +180,9 @@ class SoundCloudCrawler:
         if len(self.tracks) > 0:
             print(f'#tracks_free={free_count} ({free_count/len(self.tracks)*100:.2f}%)')
         print(f'genres={genres.most_common()[:10]}')
-        print(f'genres_free={genres_free.most_common()[:10]}')
-        print(f'genres_normalized={ {k:round(v,2) for k,v in self.get_tracks_distr().items()} }')
-        print(f'genres_free_normalized={ {k:round(v,2) for k,v in self.get_free_tracks_distr().items()} }')
+        print(f'genres_free={genres_free.most_common()[:30]}')
+        print(f'genres_normalized={ {k:round(v,4) for k,v in self.get_tracks_distr().items()} }')
+        print(f'genres_free_normalized={ {k:round(v,4) for k,v in self.get_free_tracks_distr().items()} }')
         print(f'licenses={licenses.most_common()[:10]}')
         print('==============================================')
 
@@ -274,9 +274,15 @@ class SoundCloudCrawler:
             weights = list(item[1]['free']**6 for item in candidates)
         elif mode == 'genre':
             # Prefer playlists that have different genres from what we have so far
-            free_tracks_distr = self.get_free_tracks_distr()
-            weights = list(math.exp(item[1]['free']**0.5 + penalized_bhattacharyya_dist(free_tracks_distr, item[1]['genres']))
+            tracks_distr = self.get_tracks_distr()
+            weights = list(math.exp(-100*int(item[1]['free']==0) + penalized_bhattacharyya_dist(tracks_distr, item[1]['genres']))
                            for item in candidates)
+
+        z = list(zip(candidates, weights))
+        z.sort(key=lambda item: item[1])
+        z = z[-50:]
+        candidates = [item[0] for item in z]
+        weights = [item[1] for item in z]
 
         chosen_id = random.choices(list(item[0] for item in candidates), weights=weights)[0]
 
@@ -290,7 +296,7 @@ class SoundCloudCrawler:
     async def crawl(self,
                     max_steps,
                     print_info_steps=1,
-                    save_steps=10,
+                    save_steps=100,
                     save_path=None):
         for step_num in range(max_steps):
             try:

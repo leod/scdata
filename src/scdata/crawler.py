@@ -215,29 +215,40 @@ class SoundCloudCrawler:
 
         candidates = list(self.candidate_playlists.items())
 
+        # Note that, at this point, we only have genre information of five tracks per playlist (this
+        # is the information that SoundCloud usually returns for playlist requests).
+        tracks_genre_distr = list(self.get_free_tracks_genre_distr().items())
+        tracks_genre_distr.sort(key=lambda item: item[1])
+        genre_weights = {genre: math.log(0.6**(rank+1)) if genre not in IGNORE_GENRES else 0.0
+                         for rank, (genre, _) in enumerate(tracks_genre_distr)}
+
+        def genre_novelty(candidate):
+            return sum(prob * genre_weights.get(genre, 0.0)
+                       for genre, prob
+                       in genre_distr(candidate['genres']).items())
+
+        weights = []
         if mode == 'freeness':
             # Prefer playlists that have more free licenses.
-            weights = list(math.exp(candidate['freeness']) for _, candidate in candidates)
+            for _, candidate in candidates:
+                # Penalize tracks from genres we don't care about.
+                num_ignore = sum(int(map_genre(track.get('genre')) == 'ignore')
+                                 for track in candidate.get('tracks', []))
+
+                # Also consider genre novelty, as a sort of tie breaker. Most of the weight goes
+                # towards freeness, though.
+                score = candidate['freeness'] + 0.1 * genre_novelty(candidate) - num_ignore / 2 
+
+                weights.append(np.exp(score))
         elif mode == 'genre_rank':
-            # Prefer playlists with genres that we have seen the least. I think this might be
-            # preferable to 'genre_distr'. At this point, we only have genre information of five
-            # tracks per playlist (this is the information that SoundCloud usually returns for
-            # playlist requests).
-            tracks_genre_distr = list(self.get_free_tracks_genre_distr().items())
-            tracks_genre_distr.sort(key=lambda item: item[1])
-            genre_weights = {genre: math.log(0.6**(rank+1)) if genre not in IGNORE_GENRES else 0.0
-                             for rank, (genre, _) in enumerate(tracks_genre_distr)}
+            # Prefer playlists that introduce more genre novelty.    
+            for _, candidate in candidates:
+                # Heavily penalize playlists that have no free tracks at all. Other than that,
+                # freeness has no impact, in an attempt to make it easier to find cluster sfrom
+                # other genres.
+                score = genre_novelty(candidate) - 100 * int(candidate['freeness'] == 0)
 
-            weights = [
-                math.exp(
-                    -100*int(candidate['freeness']==0) + \
-                    np.sum(list(prob * genre_weights.get(genre, 0.0)
-                                for genre, prob
-                                in genre_distr(candidate['genres']).items()))
-                )
-                for _, candidate in candidates
-            ]
-
+                weights.append(np.exp(score))
 
         candidates_weights = list(zip(candidates, weights))
         candidates_weights.sort(key=lambda pair: pair[1])
@@ -245,8 +256,8 @@ class SoundCloudCrawler:
         candidates_weights = candidates_weights[-50:]
         weights = [pair[1] for pair in candidates_weights]
 
-        #for item, weight in candidate_weights[-50:]:
-            #print(f'{weight}\t{genre_distr(item[1]["genres"])}')
+        #for item, weight in candidates_weights[-50:]:
+            #print(f'{weight}\t{genre_distr(item[1]["genres"])}\t{item[1]["freeness"]}')
 
         #choices = list(item[0] for item in top_candidates)
         choice = random.choices(candidates_weights, weights=weights)[0]

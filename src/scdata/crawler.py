@@ -67,7 +67,13 @@ class SoundCloudCrawler:
         self.visited_playlists = set(state['visited_playlists'])
         self.visited_users = set(state['visited_users'])
         self.candidate_playlists = state['candidate_playlists']
-        self.tracks = state['tracks']
+
+        # Python supports dictionaries with integer keys, but the keys are converted to strings
+        # when deserializing. This causes duplicate entries, where one of the key is a string,
+        # and the other is an integer.
+        #
+        # Prevent this issue by converting keys back to integer after deserialization.
+        self.tracks = {int(track_id): track_info for track_id, track_info in state['tracks'].zip()}
 
     def is_complete_track_info(self, info):
         # Some info may be incomplete, e.g. the playlist.tracks infos are complete only for the
@@ -257,11 +263,11 @@ class SoundCloudCrawler:
         candidates_weights = candidates_weights[-50:]
         weights = [pair[1] for pair in candidates_weights]
 
-        for item, weight in candidates_weights[-50:]:
-            print(f'{weight}\t'
-                  f'{genre_distr(item[1]["genres"])}\t'
-                  f'{item[1]["freeness"]}\t'
-                  f'{genre_novelty(item[1])}')
+        #for item, weight in candidates_weights[-50:]:
+        #    print(f'{weight}\t'
+        #          f'{genre_distr(item[1]["genres"])}\t'
+        #          f'{item[1]["freeness"]}\t'
+        #          f'{genre_novelty(item[1])}')
 
         #choices = list(item[0] for item in top_candidates)
         choice = random.choices(candidates_weights, weights=weights)[0]

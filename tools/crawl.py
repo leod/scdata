@@ -1,3 +1,5 @@
+import os
+
 import asyncio
 import aiohttp
 
@@ -12,7 +14,8 @@ async def main(config):
                             client_id=config['SC_CLIENT_ID'],
                             oauth_token=config['SC_OAUTH_TOKEN'])
         crawler = SoundCloudCrawler(api)
-        crawler.load_state('crawler_state.json')
+        if os.path.exists('crawler_state.json'):
+            crawler.load_state('crawler_state.json')
 
         urls = [
             'https://soundcloud.com/tilohensel/sets/creative-commons-music',

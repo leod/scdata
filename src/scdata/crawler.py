@@ -80,7 +80,8 @@ class SoundCloudCrawler:
         # and the other is an integer.
         #
         # Prevent this issue by converting keys back to integer after deserialization.
-        self.tracks = {int(track_id): track_info for track_id, track_info in state['tracks'].items()}
+        self.tracks = {int(track_id): track_info for track_id, track_info
+                       in state['tracks'].items()}
 
     def is_complete_track_info(self, info):
         # Some info may be incomplete, e.g. the playlist.tracks infos are complete only for the
@@ -216,19 +217,34 @@ class SoundCloudCrawler:
         # For the top free tracks added, add the playlists that they are in as candidates.
         # I've tried doing this for all new tracks, but it takes too long to do all the API calls.
         track_scores.sort(key=lambda item: item[1], reverse=True)
-        for track_info in track_scores[:5]:
-            for playlist_info in await self.api.track_playlists(track_info[0]['id']):
+        track_playlists = [
+            self.api.track_playlists(track_item[0]['id'])
+            for track_item in track_scores[:5]
+        ]
+        track_playlists = await asyncio.gather(*track_playlists)
+
+        for playlist_infos in track_playlists:
+            for playlist_info in playlist_infos:
                 self.add_candidate_playlist(playlist_info)
 
         # Try to expand our tastes a bit:
         likers = await self.api.playlist_likers(playlist_id)
-        for liker in likers[:10]:
-            if liker['id'] in self.visited_users:
-                continue
+        user_likes = [
+            self.api.user_likes(liker['id'])
+            for liker in likers[:10]
+            if liker['id'] not in self.visited_users
+        ]
+        user_likes = await asyncio.gather(*user_likes)
+
+        for likes in user_likes:
             self.visited_users.add(liker['id'])
-            for likes in await self.api.user_likes(liker['id']):
-                if 'playlist' in likes:
-                    self.add_candidate_playlist(likes['playlist'])
+            for like in likes:
+                if 'playlist' in like:
+                    self.add_candidate_playlist(like['playlist'])
+                if 'track' in like:
+                    track_info = like['track']
+                    if self.is_complete_track_info(track_info) and self.is_track_okay(track_info):
+                        self.tracks[track_info['id']] = track_info
 
     def calc_genre_novelty(self, genre_distr):
         return sum(prob * self.genre_weights.get(genre, 0.0)
@@ -239,7 +255,7 @@ class SoundCloudCrawler:
         if not self.candidate_playlists:
             return None
 
-        print('genre_weights')
+        #print('genre_weights')
 
         # Note that, at this point, we only have genre information of five tracks per playlist (this
         # is the information that SoundCloud usually returns for playlist requests).
@@ -252,7 +268,7 @@ class SoundCloudCrawler:
                                      else -10000.0
                               for rank, (genre, _) in enumerate(tracks_genre_distr)}
 
-        print('scores')
+        #print('scores')
 
         weights = []
         if mode == 'freeness':
@@ -276,7 +292,7 @@ class SoundCloudCrawler:
 
                 weights.append(np.exp(score))
 
-        print('topk')
+        #print('topk')
 
         candidates_weights = zip(self.candidate_playlists.items(), weights)
         candidates_weights = heapq.nlargest(50,
@@ -290,7 +306,7 @@ class SoundCloudCrawler:
         #          f'{item[1]["freeness"]}\t'
         #          f'{self.calc_genre_novelty(item[1]["genre_distr"])}')
 
-        print('sample')
+        #print('sample')
 
         choice_item, choice_weight = random.choices(candidates_weights, weights=weights)[0]
 

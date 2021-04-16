@@ -131,12 +131,20 @@ GENRES = set([
 
 
 def normalize_distr(weights: Dict[str, float]):
-    weights = dict(weights)
-    total = sum(weights.values()) + 0.0001
-    return {
-        'others': 0.0,
+    total = sum(weights.values()) 
+    if total == 0:
+        return {
+            'others': 1.0,
+            **weights
+        }
+
+    result = {
         **{key: value/total for key, value in weights.items()}
     }
+    if 'others' not in result:
+        result['others'] = 0.0
+
+    return result
 
 
 def kl_div(p: Dict[str, float], q: Dict[str, float]):

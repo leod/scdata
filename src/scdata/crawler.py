@@ -69,6 +69,12 @@ class SoundCloudCrawler:
         self.visited_users = set(state['visited_users'])
         self.candidate_playlists = state['candidate_playlists']
 
+        # Apply genre normalization after loading, so that we can still change the mapping later
+        # on.
+        for candidate in self.candidate_playlists.values():
+            candidate['genre_counts'] = Counter(map_genre(genre) for genre in candidate['genres'])
+            candidate['genre_distr'] = normalize_distr(candidate['genre_counts'])
+
         # Python supports dictionaries with integer keys, but the keys are converted to strings
         # when deserializing. This causes duplicate entries, where one of the key is a string,
         # and the other is an integer.
@@ -158,10 +164,13 @@ class SoundCloudCrawler:
 
         genres = [track['genre'] for track in playlist_info.get('tracks', [])
                   if track.get('genre') is not None]
+        genre_counts = Counter(map_genre(genre) for genre in genres)
 
         self.candidate_playlists[playlist_info['id']] = {
             'freeness': self.get_playlist_freeness(playlist_info),
-            'genres': genres
+            'genres': genres,
+            'genre_counts': genre_counts,
+            'genre_distr': normalize_distr(genre_counts),
         }
 
         # We get up to five full track infos for free per playlist. Record them.
@@ -221,10 +230,10 @@ class SoundCloudCrawler:
                 if 'playlist' in likes:
                     self.add_candidate_playlist(likes['playlist'])
 
-    def calc_genre_novelty(self, genres):
+    def calc_genre_novelty(self, genre_distr):
         return sum(prob * self.genre_weights.get(genre, 0.0)
                    for genre, prob
-                   in genre_distr(genres).items())
+                   in genre_distr.items())
 
     def choose_playlist(self, mode):
         if not self.candidate_playlists:
@@ -236,9 +245,12 @@ class SoundCloudCrawler:
         # is the information that SoundCloud usually returns for playlist requests).
         tracks_genre_distr = list(self.get_free_tracks_genre_distr().items())
         tracks_genre_distr.sort(key=lambda item: item[1])
-        self.genre_weights = {genre: math.log(0.6**(rank+1)) if genre not in IGNORE_GENRES else -10000.0
+        self.genre_weights = {genre: math.log(0.6**(rank+1))
+                                     if genre not in IGNORE_GENRES and \
+                                        genre != 'others' and \
+                                        genre != 'unknown'
+                                     else -10000.0
                               for rank, (genre, _) in enumerate(tracks_genre_distr)}
-
 
         print('scores')
 
@@ -246,15 +258,11 @@ class SoundCloudCrawler:
         if mode == 'freeness':
             # Prefer playlists that have more free licenses.
             for candidate in self.candidate_playlists.values():
-                # Penalize tracks from genres we don't care about.
-                num_ignore = sum(int(map_genre(genre) == 'ignore')
-                                 for genre in candidate['genres'])
-
-                # Also consider genre novelty, as a sort of tie breaker. Most of the weight goes
-                # towards freeness, though.
+                # Penalize tracks from genres we don't care about. Also consider genre novelty, as
+                # a sort of tie breaker. Most of the weight goes towards freeness, though.
                 score = candidate['freeness'] \
-                    + 0.1 * self.calc_genre_novelty(candidate['genres']) \
-                    - num_ignore
+                    + 0.1 * self.calc_genre_novelty(candidate['genre_distr']) \
+                    - candidate['genre_counts'].get('ignore', 0)
 
                 weights.append(np.exp(score))
         elif mode == 'genre_rank':
@@ -263,7 +271,7 @@ class SoundCloudCrawler:
                 # Heavily penalize playlists that have no free tracks at all. Other than that,
                 # freeness has no impact, in an attempt to make it easier to find cluster sfrom
                 # other genres.
-                score = self.calc_genre_novelty(candidate) \
+                score = self.calc_genre_novelty(candidate['genre_distr']) \
                     - 100 * int(candidate['freeness'] == 0)
 
                 weights.append(np.exp(score))
@@ -278,9 +286,9 @@ class SoundCloudCrawler:
 
         #for item, weight in candidates_weights[-50:]:
         #    print(f'{weight}\t'
-        #          f'{genre_distr(item[1]["genres"])}\t'
+        #          f'{item[1]["genre_distr"]}\t'
         #          f'{item[1]["freeness"]}\t'
-        #          f'{self.calc_genre_novelty(item[1])}')
+        #          f'{self.calc_genre_novelty(item[1]["genre_distr"])}')
 
         print('sample')
 
@@ -311,7 +319,7 @@ class SoundCloudCrawler:
             try:
                 if save_path is not None and step_num % save_steps == 0:
                     self.save_state(save_path)
-                if print_info_steps > 0 and step_num % print_info_steps == 0:
+                if print_info_steps > 0 and step_num > 0 and step_num % print_info_steps == 0:
                     self.print_info()
 
                 print(f'step {step_num}, mode="freeness"')

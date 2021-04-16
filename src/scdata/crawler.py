@@ -68,12 +68,6 @@ class SoundCloudCrawler:
         self.visited_playlists = set(state['visited_playlists'])
         self.visited_users = set(state['visited_users'])
 
-        # Apply genre normalization after loading, so that we can still change the mapping later
-        # on.
-        for candidate in self.candidate_playlists.values():
-            candidate['genre_counts'] = Counter(map_genre(genre) for genre in candidate['genres'])
-            candidate['genre_distr'] = normalize_distr(candidate['genre_counts'])
-
         # Python supports dictionaries with integer keys, but the keys are converted to strings
         # when deserializing. This causes duplicate entries, where one of the key is a string,
         # and the other is an integer.
@@ -148,9 +142,6 @@ class SoundCloudCrawler:
     def get_track_freeness(self, info):
         return int('license' in info and self.is_free(info['license'])) 
 
-    def get_playlist_freeness(self, info):
-        return sum(self.get_track_freeness(track_info) for track_info in info['tracks'])
-
     def get_tracks_genre_distr(self):
         return genre_distr(info.get('genre') for info in self.tracks.values())
 
@@ -168,13 +159,7 @@ class SoundCloudCrawler:
                   if track.get('genre') is not None]
         genre_counts = Counter(map_genre(genre) for genre in genres)
 
-        self.candidate_playlists[playlist_info['id']] = {
-            'freeness': self.get_playlist_freeness(playlist_info),
-            'genres': genres,
-            'genre_counts': genre_counts,
-            'genre_distr': normalize_distr(genre_counts),
-            'track_ids': playlist_info['tracks']
-        }
+        self.candidate_playlists[playlist_info['id']] = playlist_info
 
         # We get up to five full track infos for free per playlist. Record them.
         for track_info in playlist_info['tracks']:
@@ -207,35 +192,50 @@ class SoundCloudCrawler:
         track_infos = await asyncio.gather(*track_infos)
 
         num_known = 0
+        num_total = 0
         num_incomplete = 0
         num_not_okay = 0
         num_new = 0
+        num_new_free = 0
+        num_free = 0
 
         track_scores = []
         for track_info in track_infos:
             self.visited_tracks.add(track_info['id'])
 
+            num_total += 1
+            skip = False
+
+            if self.is_free(track_info['license']):
+                num_free += 1
+
             if track_info['id'] in self.tracks:
                 num_known += 1
-                continue
+                skip = True
             if not self.is_complete_track_info(track_info):
                 num_incomplete += 1
-                continue
+                skip = True
             if not self.is_track_okay(track_info):
                 num_not_okay += 1
+                skip = True
+            if skip:
                 continue
 
             num_new += 1
+            if self.is_free(track_info['license']):
+                num_new_free += 1
 
             self.tracks[track_info['id']] = track_info
 
             track_score = self.get_track_freeness(track_info)
             track_scores.append((track_info, track_score))
 
-        print(f'    #known={num_known}, '
-              f'#incomplete={num_incomplete}, '
+        print(f'    #total={num_total}, '
+              f'#known={num_known}, '
               f'#not_okay={num_not_okay}, '
-              f'#new={num_new}')
+              f'#new={num_new}, '
+              f'#free={num_free}, '
+              f'#new_free={num_new_free}')
 
         # For the top free tracks added, add the playlists that they are in as candidates.
         # I've tried doing this for all new tracks, but it takes too long to do all the API calls.
@@ -266,7 +266,7 @@ class SoundCloudCrawler:
                     self.add_candidate_playlist(like['playlist'])
                 if 'track' in like:
                     track_info = like['track']
-                    if self.is_complete_track_info(track_info) and self.is_track_okay(track_info):
+                    if self.is_track_okay(track_info):
                         self.tracks[track_info['id']] = track_info
 
     def calc_genre_novelty(self, genre_distr):
@@ -274,7 +274,7 @@ class SoundCloudCrawler:
                    for genre, prob
                    in genre_distr.items())
 
-    def choose_playlist(self, mode):
+    def choose_playlist(self):
         if not self.candidate_playlists:
             return None
 
@@ -284,7 +284,7 @@ class SoundCloudCrawler:
         # is the information that SoundCloud usually returns for playlist requests).
         tracks_genre_distr = list(self.get_free_tracks_genre_distr().items())
         tracks_genre_distr.sort(key=lambda item: item[1])
-        self.genre_weights = {genre: math.log(0.6**(rank+1))
+        self.genre_weights = {genre: math.log(0.95**(rank+1))
                                      if genre not in IGNORE_GENRES and \
                                         genre != 'others' and \
                                         genre != 'unknown'
@@ -294,22 +294,35 @@ class SoundCloudCrawler:
         #print('scores')
 
         weights = []
-        # Prefer playlists that have more free licenses.
         for candidate in self.candidate_playlists.values():
-            if mode == 'freeness':
-                # Penalize tracks from genres we don't care about. Also consider genre novelty, as
-                # a sort of tie breaker. Most of the weight goes towards freeness, though.
-                score = candidate['freeness'] \
-                    + 0.1 * self.calc_genre_novelty(candidate['genre_distr']) \
-                    - candidate['genre_counts'].get('ignore', 0)
-            elif mode == 'genre_rank':
-                # Heavily penalize playlists that have no free tracks at all. Other than that,
-                # freeness has no impact, in an attempt to make it easier to find cluster sfrom
-                # other genres.
-                score = self.calc_genre_novelty(candidate['genre_distr']) \
-                    - 100 * int(candidate['freeness'] == 0)
+            track_values = []
+            new_tracks = 0
 
-            weights.append(np.exp(score))
+            for track_info in candidate['tracks']:
+                if track_info['id'] not in self.tracks:
+                    new_tracks += 1
+
+                if self.is_complete_track_info(track_info):
+                    mapped_genre = map_genre(track_info['genre'])
+                    if mapped_genre == 'ignore':
+                        track_value = 0.0
+                    else:
+                        track_value = 1.0
+                        track_value *= 1.0 if self.is_free(track_info['license']) else 0.005
+                        track_value *= 1.0 if self.is_track_okay(track_info) else 0.01
+                        track_value *= 1.0 if track_info['id'] not in self.tracks else 0.01
+                        track_value *= math.exp(self.genre_weights.get(mapped_genre, 0.0))
+
+                    track_values.append(track_value)
+
+            if len(track_values) == 0:
+                weights.append(0.0)
+            else:
+                size_mult = 2/(1+math.exp(-new_tracks/3))-1
+                new_ratio = new_tracks / len(candidate['tracks'])
+                mean_score = new_ratio * np.mean(track_values)
+                score = size_mult * mean_score 
+                weights.append(math.exp(2000.0 * score))
 
         #print('topk')
 
@@ -330,13 +343,12 @@ class SoundCloudCrawler:
         choice_item, choice_weight = random.choices(candidates_weights, weights=weights)[0]
 
         print(f'    playlist_id: {choice_item[0]}, '
-              f'freeness: {choice_item[1]["freeness"]}, '
               f'weight: {choice_weight}')
 
         return choice_item[0]
 
-    async def crawl_step(self, mode):
-        playlist_id = self.choose_playlist(mode)
+    async def crawl_step(self):
+        playlist_id = self.choose_playlist()
         if playlist_id is None:
             return False
         del self.candidate_playlists[playlist_id]
@@ -357,12 +369,8 @@ class SoundCloudCrawler:
                 if print_info_steps > 0 and step_num % print_info_steps == 0:
                     self.print_info()
 
-                print(f'step {step_num}, mode="freeness"')
-                if not await self.crawl_step(mode='freeness'):
-                    return
-
-                print(f'step {step_num}, mode="genre_rank"')
-                if not await self.crawl_step(mode='genre_rank'):
+                print(f'step {step_num}')
+                if not await self.crawl_step():
                     return
             except Exception as e:
                 print(f'Caught exception {e}')

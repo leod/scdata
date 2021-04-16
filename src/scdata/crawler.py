@@ -189,8 +189,9 @@ class SoundCloudCrawler:
             if self.is_track_okay(track_info):
                 self.tracks[track_info['id']] = track_info
 
-            track_score = self.get_track_freeness(track_info)
-            track_scores.append((track_info, track_score))
+                track_score = self.get_track_freeness(track_info)
+                track_scores.append((track_info, track_score))
+
 
         # For the top free tracks added, add the playlists that they are in as candidates.
         # I've tried doing this for all new tracks, but it takes too long to do all the API calls.
@@ -219,7 +220,7 @@ class SoundCloudCrawler:
         # is the information that SoundCloud usually returns for playlist requests).
         tracks_genre_distr = list(self.get_free_tracks_genre_distr().items())
         tracks_genre_distr.sort(key=lambda item: item[1])
-        genre_weights = {genre: math.log(0.6**(rank+1)) if genre not in IGNORE_GENRES else 0.0
+        genre_weights = {genre: math.log(0.6**(rank+1)) if genre not in IGNORE_GENRES else -10000.0
                          for rank, (genre, _) in enumerate(tracks_genre_distr)}
 
         def genre_novelty(candidate):
@@ -232,12 +233,12 @@ class SoundCloudCrawler:
             # Prefer playlists that have more free licenses.
             for _, candidate in candidates:
                 # Penalize tracks from genres we don't care about.
-                num_ignore = sum(int(map_genre(track.get('genre')) == 'ignore')
-                                 for track in candidate.get('tracks', []))
+                num_ignore = sum(int(map_genre(genre) == 'ignore')
+                                 for genre in candidate['genres'])
 
                 # Also consider genre novelty, as a sort of tie breaker. Most of the weight goes
                 # towards freeness, though.
-                score = candidate['freeness'] + 0.1 * genre_novelty(candidate) - num_ignore / 2 
+                score = candidate['freeness'] + 0.1 * genre_novelty(candidate) - num_ignore
 
                 weights.append(np.exp(score))
         elif mode == 'genre_rank':
@@ -256,8 +257,11 @@ class SoundCloudCrawler:
         candidates_weights = candidates_weights[-50:]
         weights = [pair[1] for pair in candidates_weights]
 
-        #for item, weight in candidates_weights[-50:]:
-            #print(f'{weight}\t{genre_distr(item[1]["genres"])}\t{item[1]["freeness"]}')
+        for item, weight in candidates_weights[-50:]:
+            print(f'{weight}\t'
+                  f'{genre_distr(item[1]["genres"])}\t'
+                  f'{item[1]["freeness"]}\t'
+                  f'{genre_novelty(item[1])}')
 
         #choices = list(item[0] for item in top_candidates)
         choice = random.choices(candidates_weights, weights=weights)[0]

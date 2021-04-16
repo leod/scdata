@@ -31,7 +31,7 @@ async def main(config):
         print('following:', followings[0]['id'], followings[0]['kind'])
 
         info = await api.resolve('https://soundcloud.com/digitalstreams/sets/newtracks')
-        print('set:', info['id'], info['kind'])
+        print('set:', json.dumps(info))
 
 
         print(json.dumps(info, indent=4))

@@ -22,7 +22,7 @@ from scdata.genre import (GENRES,
 
 def playlist_distr(playlist_info):
     genres = [track_info['genre']
-              for track_info in playlist_info.get('tracks', [])
+              for track_info in playlist_info['tracks']
               if track_info.get('genre') is not None]
     return genre_distr(genres)
 
@@ -149,9 +149,7 @@ class SoundCloudCrawler:
         return int('license' in info and self.is_free(info['license'])) 
 
     def get_playlist_freeness(self, info):
-        if not info.get('tracks', []):
-            return 0.0
-        return sum(self.get_track_freeness(track_info) for track_info in info.get('tracks', []))
+        return sum(self.get_track_freeness(track_info) for track_info in info['tracks'])
 
     def get_tracks_genre_distr(self):
         return genre_distr(info.get('genre') for info in self.tracks.values())
@@ -163,8 +161,10 @@ class SoundCloudCrawler:
     def add_candidate_playlist(self, playlist_info):
         if playlist_info['id'] in self.visited_playlists:
             return
+        if not playlist_info.get('tracks', []):
+            return
 
-        genres = [track['genre'] for track in playlist_info.get('tracks', [])
+        genres = [track['genre'] for track in playlist_info['tracks']
                   if track.get('genre') is not None]
         genre_counts = Counter(map_genre(genre) for genre in genres)
 
@@ -173,10 +173,11 @@ class SoundCloudCrawler:
             'genres': genres,
             'genre_counts': genre_counts,
             'genre_distr': normalize_distr(genre_counts),
+            'track_ids': playlist_info['tracks']
         }
 
         # We get up to five full track infos for free per playlist. Record them.
-        for track_info in playlist_info.get('tracks', []):
+        for track_info in playlist_info['tracks']:
             if self.is_track_okay(track_info):
                 self.tracks[track_info['id']] = track_info
 
@@ -201,7 +202,7 @@ class SoundCloudCrawler:
 
         track_infos = [
             self.fill_track_info(track_info)
-            for track_info in playlist_info.get('tracks', [])[:50]
+            for track_info in playlist_info['tracks'][:50]
         ]
         track_infos = await asyncio.gather(*track_infos)
 
@@ -319,7 +320,7 @@ class SoundCloudCrawler:
         weights = [pair[1] for pair in candidates_weights]
 
         #for item, weight in candidates_weights[-50:]:
-        #    print(f'\t{weight}\t'
+        #    print(f'    {weight}\t'
         #          f'{item[1]["genre_distr"]}\t'
         #          f'{item[1]["freeness"]}\t'
         #          f'{self.calc_genre_novelty(item[1]["genre_distr"])}')

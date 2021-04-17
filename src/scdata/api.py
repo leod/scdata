@@ -7,6 +7,9 @@ import aiohttp
 import aiohttp.web
 import asyncio
 
+import mutagen
+from mutagen.id3 import ID3, TIT2, COMM, TCON, TDRC, APIC, TPE1
+
 # API v1 does not work for me, defaulting to v2 (which is the one being used by their frontend).
 # See also <https://twitter.com/gdemey/status/639547648970760192>.
 DEFAULT_SERVER = 'https://api-v2.soundcloud.com'
@@ -38,25 +41,40 @@ class SoundCloudAPI:
         self.num_calls += 1
 
         async with self.session.get(url, headers=headers) as response:
-            #return await response.json()
             data = await response.read()
-            print(data)
             return json.loads(data)
 
     async def save_track(self, track_info, filename):
+        url = None
         for transcoding in track_info['media']['transcodings']:
             if transcoding['format']['protocol'] == 'progressive':
-                url = f'{transcoding["url"]}?client_id={self.client_id}'
-                url = (await self.get(url, root=''))['url']
-                async with self.session.get(url) as response:
-                    with open(filename, 'wb') as f:
-                        while True:
-                            chunk = await response.content.read(1024)
-                            if not chunk:
-                                break
-                            f.write(chunk)
-                return True
-        return False
+                url = transcoding['url']
+        if not url:
+            return False
+
+        url = (await self.get(url, root=''))['url']
+        async with self.session.get(url) as response:
+            with open(filename, 'wb') as f:
+                while True:
+                    chunk = await response.content.read(1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+
+        artwork_url = track_info['artwork_url'].replace('large', 't300x300')
+        async with self.session.get(artwork_url) as response:
+            artwork = await response.read()
+
+        tags = mutagen.File(filename)
+        tags.add_tags()
+        tags['TPE1'] = TPE1(encoding=3, text=track_info['user']['username'])
+        tags['TIT2'] = TIT2(encoding=3, text=track_info['title'])
+        tags['TCON'] = TCON(encoding=3, text=track_info['genre'])
+        tags['TDRC'] = TDRC(encoding=3, text=track_info['created_at'])
+        tags['APIC'] = APIC(encoding=3, mime='image/jpeg', type=3, desc='Cover', data=artwork)
+        tags.save(filename, v1=2)
+
+        return True
          
 
     async def resolve(self, soundcloud_url: str):

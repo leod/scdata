@@ -1,3 +1,4 @@
+import json
 from typing import Dict
 
 from urllib.parse import quote
@@ -26,16 +27,37 @@ class SoundCloudAPI:
     def get_num_calls(self):
         return self.num_calls
 
-    async def get(self, resource: str, args: Dict[str, str] = {}, json=True):
+    async def get(self, resource: str, args: Dict[str, str] = {}, root=None):
+        if root is None:
+            root = self.server + '/'
         args = {'client_id': self.client_id, **args}
         url_args = '&'.join(f'{key}={quote(value)}' for key, value in args.items())
-        url = f'{self.server}/{resource}?{url_args}'
+        url = f'{root}{resource}?{url_args}'
         headers = {'Authorization': 'OAuth ' + self.oauth_token}
 
         self.num_calls += 1
 
         async with self.session.get(url, headers=headers) as response:
-            return await response.json()
+            #return await response.json()
+            data = await response.read()
+            print(data)
+            return json.loads(data)
+
+    async def save_track(self, track_info, filename):
+        for transcoding in track_info['media']['transcodings']:
+            if transcoding['format']['protocol'] == 'progressive':
+                url = f'{transcoding["url"]}?client_id={self.client_id}'
+                url = (await self.get(url, root=''))['url']
+                async with self.session.get(url) as response:
+                    with open(filename, 'wb') as f:
+                        while True:
+                            chunk = await response.content.read(1024)
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                return True
+        return False
+         
 
     async def resolve(self, soundcloud_url: str):
         return await self.get('resolve', {'url': soundcloud_url})

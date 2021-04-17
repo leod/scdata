@@ -107,11 +107,44 @@ class SoundCloudCrawler:
 
         return True
 
+    def is_track_complete(self, track):
+        mapped_genre = map_genre(track.get('genre'))
+        if mapped_genre in ['others', 'ignore', 'unknown']:
+            return False
+        if not self.is_free(track['license']):
+            return False
+        if not isinstance(track['artwork_url'], str):
+            return False
+        if not track['artwork_url'].startswith('https://'):
+            return False
+        if not track.get('title'):
+            return False
+        if not track['media'].get('transcodings'):
+            return False
+        return True
+
     def print_info(self):
         licenses = Counter(info['license'] for info in self.tracks.values())
         free_count = sum(1 if self.is_free(info['license']) else 0
                          for info in self.tracks.values())
         free_perc = free_count / len(self.tracks) * 100
+
+        complete_tracks = Counter()
+        complete_nodl_tracks = Counter()
+        complete_count = 0
+        complete_nodl_count = 0
+        for track in self.tracks.values():
+            if not self.is_track_complete(track):
+                continue
+
+            complete_nodl_tracks[mapped_genre] += 1
+            complete_nodl_count += 1
+
+            if track['downloadable'] != True or track['has_downloads_left'] != True:
+                continue
+
+            complete_tracks[mapped_genre] += 1
+            complete_count += 1
 
         ignore_genres = Counter(track.get('genre') for track in self.tracks.values()
                                 if map_genre(track.get('genre')) == 'ignore')
@@ -121,6 +154,8 @@ class SoundCloudCrawler:
         other_count = sum(other_genres.values())
         ignore_perc = ignore_count / len(self.tracks) * 100
         other_perc = other_count / len(self.tracks) * 100
+        complete_perc = complete_count / len(self.tracks) * 100
+        complete_nodl_perc = complete_nodl_count / len(self.tracks) * 100
 
         print('=================================================================================')
         print(f'#api_calls:           {self.api.get_num_calls()}')
@@ -132,10 +167,14 @@ class SoundCloudCrawler:
         print(f'    #free:            {free_count} ({free_perc:.2f}%)')
         print(f'    #ignore_genre:    {ignore_count} ({ignore_perc:.2f}%)')
         print(f'    #other_genre:     {other_count} ({other_perc:.2f}%)')
+        print(f'    #complete:        {complete_count} ({complete_perc:.2f}%)')
+        print(f'    #complete_nodl:   {complete_nodl_count} ({complete_nodl_perc:.2f}%)')
         print(f'genres:               {pp_distr(self.get_tracks_genre_distr())}')
         print(f'genres_free:          {pp_distr(self.get_free_tracks_genre_distr())}')
         print(f'ignore_genres:        {ignore_genres.most_common()[:10]}')
         print(f'other_genres:         {other_genres.most_common()[:10]}')
+        print(f'complete_tracks:      {complete_tracks.most_common()}')
+        print(f'complete_nodl_tracks: {complete_nodl_tracks.most_common()}')
         print(f'licenses:             {licenses.most_common()[:10]}')
         print('=================================================================================')
 
@@ -187,7 +226,7 @@ class SoundCloudCrawler:
 
         track_infos = [
             self.fill_track_info(track_info)
-            for track_info in playlist_info['tracks'][:50]
+            for track_info in playlist_info['tracks'][:100]
         ]
         track_infos = await asyncio.gather(*track_infos)
 
@@ -230,13 +269,6 @@ class SoundCloudCrawler:
             track_score = self.get_track_freeness(track_info)
             track_scores.append((track_info, track_score))
 
-        print(f'    #total={num_total}, '
-              f'#known={num_known}, '
-              f'#not_okay={num_not_okay}, '
-              f'#new={num_new}, '
-              f'#free={num_free}, '
-              f'#new_free={num_new_free}')
-
         # For the top free tracks added, add the playlists that they are in as candidates.
         # I've tried doing this for all new tracks, but it takes too long to do all the API calls.
         track_scores.sort(key=lambda item: item[1], reverse=True)
@@ -254,12 +286,15 @@ class SoundCloudCrawler:
         likers = await self.api.playlist_likers(playlist_id)
         user_likes = [
             self.api.user_likes(liker['id'])
-            for liker in likers[:10]
+            for liker in likers[:50]
             if liker['id'] not in self.visited_users
         ]
         user_likes = await asyncio.gather(*user_likes)
 
-        for liker, likes in zip(likers[:10], user_likes):
+        num_new_user_tracks = 0
+        num_new_user_tracks_free = 0
+
+        for liker, likes in zip(likers[:50], user_likes):
             self.visited_users.add(liker['id'])
             for like in likes:
                 if 'playlist' in like:
@@ -268,11 +303,19 @@ class SoundCloudCrawler:
                     track_info = like['track']
                     if self.is_track_okay(track_info):
                         self.tracks[track_info['id']] = track_info
+                        num_new_user_tracks += 1
+                        if self.is_free(track_info['license']):
+                            num_new_user_tracks_free += 1
 
-    def calc_genre_novelty(self, genre_distr):
-        return sum(prob * self.genre_weights.get(genre, 0.0)
-                   for genre, prob
-                   in genre_distr.items())
+
+        print(f'    #total={num_total}, '
+              f'#known={num_known}, '
+              f'#not_okay={num_not_okay}, '
+              f'#new={num_new}, '
+              f'#free={num_free}, '
+              f'#new_free={num_new_free}; '
+              f'#new_user_tracks={num_new_user_tracks}, '
+              f'#new_user_tracks_free={num_new_user_tracks_free}')
 
     def choose_playlist(self):
         if not self.candidate_playlists:

@@ -45,13 +45,20 @@ async def main(crawler_state, out_audio_dir, config):
 
         print(f'Missing tracks: {len(missing_tracks)}')
 
+        fails = 0
         for track_info, audio_path in tqdm(missing_tracks):
             print(track_info['user']['username'], '|||',
                   track_info['title'], '|||',
                   track_info['genre'], '|||',
                   map_genre(track_info['genre']))
             os.makedirs(os.path.dirname(audio_path), exist_ok=True)
-            await api.save_track(track_info, audio_path)
+            try:
+                await api.save_track(track_info, audio_path)
+            except Exception as e:
+                fails += 1
+                print(f'Caught exception {e}')
+
+        print(f'#fails: {fails}')
 
 
 if __name__ == '__main__':

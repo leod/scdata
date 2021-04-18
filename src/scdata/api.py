@@ -50,7 +50,7 @@ class SoundCloudAPI:
             if transcoding['format']['protocol'] == 'progressive':
                 url = transcoding['url']
         if not url:
-            return False
+            raise ValueError('No progressive protocol available')
 
         url = (await self.get(url, root=''))['url']
         async with self.session.get(url) as response:
@@ -73,8 +73,6 @@ class SoundCloudAPI:
         tags['TDRC'] = TDRC(encoding=3, text=track_info['created_at'])
         tags['APIC'] = APIC(encoding=3, mime='image/jpeg', type=3, desc='Cover', data=artwork)
         tags.save(filename, v1=2)
-
-        return True
          
 
     async def resolve(self, soundcloud_url: str):

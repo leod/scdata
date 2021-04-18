@@ -73,7 +73,8 @@ class SoundCloudCrawler:
         # and the other is an integer.
         #
         # Prevent this issue by converting keys back to integer after deserialization.
-        self.tracks = {int(track_id): track_info for track_id, track_info
+        self.tracks = {int(track_id): self.strip_track_info(track_info)
+                       for track_id, track_info
                        in state['tracks'].items()}
         self.candidate_playlists = {int(playlist_id): playlist_info for playlist_id, playlist_info
                                     in state['candidate_playlists'].items()}
@@ -123,6 +124,17 @@ class SoundCloudCrawler:
             return False
         return True
 
+    def strip_track_info(self, info):
+        # Non-free tracks are only kept around for statistics, so we can remove other fields.
+        if self.is_free(info.get('license')):
+            return info
+        else:
+            return {
+                'id': info['id'],
+                'genre': info.get('genre'),
+                'license': info.get('license'),
+            }
+
     def print_info(self):
         licenses = Counter(info['license'] for info in self.tracks.values())
         free_count = sum(1 if self.is_free(info['license']) else 0
@@ -136,6 +148,8 @@ class SoundCloudCrawler:
         for track in self.tracks.values():
             if not self.is_track_complete(track):
                 continue
+
+            mapped_genre = map_genre(track['genre'])
 
             complete_nodl_tracks[mapped_genre] += 1
             complete_nodl_count += 1
@@ -203,7 +217,7 @@ class SoundCloudCrawler:
         # We get up to five full track infos for free per playlist. Record them.
         for track_info in playlist_info['tracks']:
             if self.is_track_okay(track_info):
-                self.tracks[track_info['id']] = track_info
+                self.tracks[track_info['id']] = self.strip_track_info(track_info)
 
     async def add_candidate_playlist_url(self, soundcloud_url: str):
         info = await self.api.resolve(soundcloud_url) 
@@ -264,7 +278,7 @@ class SoundCloudCrawler:
             if self.is_free(track_info['license']):
                 num_new_free += 1
 
-            self.tracks[track_info['id']] = track_info
+            self.tracks[track_info['id']] = self.strip_track_info(track_info)
 
             track_score = self.get_track_freeness(track_info)
             track_scores.append((track_info, track_score))
@@ -302,7 +316,7 @@ class SoundCloudCrawler:
                 if 'track' in like:
                     track_info = like['track']
                     if self.is_track_okay(track_info):
-                        self.tracks[track_info['id']] = track_info
+                        self.tracks[track_info['id']] = self.strip_track_info(track_info)
                         num_new_user_tracks += 1
                         if self.is_free(track_info['license']):
                             num_new_user_tracks_free += 1
@@ -321,23 +335,30 @@ class SoundCloudCrawler:
         if not self.candidate_playlists:
             return None
 
-        #print('genre_weights')
+        print('genre_weights')
 
         # Note that, at this point, we only have genre information of five tracks per playlist (this
         # is the information that SoundCloud usually returns for playlist requests).
         tracks_genre_distr = list(self.get_free_tracks_genre_distr().items())
         tracks_genre_distr.sort(key=lambda item: item[1])
-        self.genre_weights = {genre: math.log(0.95**(rank+1))
+        self.genre_weights = {genre: 0.85**(rank+1)
                                      if genre not in IGNORE_GENRES and \
                                         genre != 'others' and \
                                         genre != 'unknown'
-                                     else -10000.0
+                                     else 0.0
                               for rank, (genre, _) in enumerate(tracks_genre_distr)}
 
-        #print('scores')
+        print('candidates')
+
+        # The below scoring code is pretty slow, and the number of candidate playlists grows over
+        # time. We can try to speed it up by sampling a random subset of candidates in each step.
+        candidates = random.sample(list(self.candidate_playlists.items()),
+                                   k=20000)
+
+        print('scores')
 
         weights = []
-        for candidate in self.candidate_playlists.values():
+        for _, candidate in candidates:
             track_values = []
             new_tracks = 0
 
@@ -351,25 +372,25 @@ class SoundCloudCrawler:
                         track_value = 0.0
                     else:
                         track_value = 1.0
-                        track_value *= 1.0 if self.is_free(track_info['license']) else 0.005
+                        track_value *= 1.0 if self.is_free(track_info['license']) else 0.00005
                         track_value *= 1.0 if self.is_track_okay(track_info) else 0.01
                         track_value *= 1.0 if track_info['id'] not in self.tracks else 0.01
-                        track_value *= math.exp(self.genre_weights.get(mapped_genre, 0.0))
+                        track_value *= self.genre_weights.get(mapped_genre, 0.0)
 
                     track_values.append(track_value)
 
             if len(track_values) == 0:
                 weights.append(0.0)
             else:
-                size_mult = 2/(1+math.exp(-new_tracks/3))-1
+                size_mult = 2/(1+math.exp(-new_tracks/20))-1
                 new_ratio = new_tracks / len(candidate['tracks'])
                 mean_score = new_ratio * np.mean(track_values)
-                score = size_mult * mean_score 
-                weights.append(math.exp(2000.0 * score))
+                score = size_mult * mean_score
+                weights.append(math.exp(10000.0 * score))
 
-        #print('topk')
+        print('topk')
 
-        candidates_weights = zip(self.candidate_playlists.items(), weights)
+        candidates_weights = zip(candidates, weights)
         candidates_weights = heapq.nlargest(50,
                                             candidates_weights,
                                             key=lambda pair: pair[1])
@@ -381,7 +402,7 @@ class SoundCloudCrawler:
         #          f'{item[1]["freeness"]}\t'
         #          f'{self.calc_genre_novelty(item[1]["genre_distr"])}')
 
-        #print('sample')
+        print('sample')
 
         choice_item, choice_weight = random.choices(candidates_weights, weights=weights)[0]
 
@@ -402,8 +423,8 @@ class SoundCloudCrawler:
 
     async def crawl(self,
                     max_steps,
-                    print_info_steps=1,
-                    save_steps=100,
+                    print_info_steps=10,
+                    save_steps=500,
                     save_path=None):
         for step_num in range(max_steps):
             try:

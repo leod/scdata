@@ -25,8 +25,8 @@ async def main(crawler_state, out_audio_dir, config):
         print(f'Loading crawler state from "{crawler_state}"')
 
         crawler = SoundCloudCrawler(api)
-        if os.path.exists('crawler_state.json'):
-            crawler.load_state('crawler_state.json')
+        if os.path.exists(crawler_state):
+            crawler.load_state(crawler_state)
 
         print('Finished loading crawler state')
 

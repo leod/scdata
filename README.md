@@ -66,10 +66,10 @@ Balancing the two goals seems to be difficult. If you want to improve the crawli
 playlist score is a good place to start. In initial experiments, without the playlist score, the
 crawler ended up finding too few free tracks.
 
-Note that the playlist score usually only has access to full information on the *first five* tracks
+Note that the playlist score usually only has access to full information of the *first five* tracks
 in the playlist. For the other tracks, we would need to make individual requests, which is something
 we want to do only for the playlist that has been chosen for expansion. This makes the job of the
-playlist score more difficult, since it has only limited information of track genres and licenses.
+playlist score more difficult, since it has only limited genre and license information.
 
 ### Output
 

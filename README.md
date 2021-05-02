@@ -29,8 +29,9 @@ The state is written to `crawler_state.json` every 500 steps, and the process ca
 this.
 
 The crawler requires a `.env` file to be available in the current directory, containing the keys
-`SC_CLIENT_ID` and `SC_OAUTH_TOKEN`. The values from these can be inferred by visiting SoundCloud
-and using the developer tools to inspect network calls made by your browser.
+`SC_CLIENT_ID` and `SC_OAUTH_TOKEN`. The values for these can be inferred by visiting SoundCloud
+and using the developer tools to inspect network calls made by your browser. This is necessary for
+using the SoundCloud API.
 
 #### Implementation Details
 

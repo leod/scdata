@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Starting from the track metadata in the crawler state, download the actual tracks.
 """

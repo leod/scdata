@@ -51,6 +51,8 @@ GENRE_MAP = {
     'singer-songwriter': 'folk & singer-songwriter', # merge with super
     'soul': 'r&b & soul', # merge with super
     'triphop': 'trip-hop', # alias
+    'metalcore': 'metal', # merge with super
+    'noise': 'experimental', # merge with super
 }
 
 # Ignore some genres for this project.

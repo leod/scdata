@@ -11,6 +11,35 @@ source .venv/bin/activate
 pip install -e .
 ```
 
+## Overview
+
+The dataset was created in April 2020. It consists of 34423 tracks that were uploaded either under
+a Creative Commens license, or with no rights reserved. For each MP3 track, the dataset has the full
+metadata as it was returned by the SoundCloud API. Furthermore, every track in the dataset has a
+cover image.
+
+The dataset has been split into a train set (32651 tracks), a dev set (1665 tracks), and a test set
+(1210 tracks).
+
+Genres can be arbitrarily specified on SoundCloud. Here, we normalize genres according to a
+hand-defined (and likely flawed in some sense) genre list. For more details, please refer to
+[`genre.py`](src/scdata/genre.py). The dataset consists only of tracks whose normalized genre is part
+of this list. The dataset metadata still contains the raw genre, so the genre normalization can be
+redefined.
+
+## Usage
+
+Track metadata is stored in a single file called `scdata.json`. Example usage:
+
+```python
+import json
+
+with open('scdata.json') as f:
+   scdata = json.load(f)
+
+# TODO
+```
+
 ## Data Preparation
 
 The following steps describe how the dataset was prepared.
@@ -95,3 +124,31 @@ Only tracks that satisfy all of the following conditions are downloaded:
 5. The track has a download link.
 
 Some metadata, as well as the artwork, is added to the downloaded `.mp3` files.
+
+### 3 Hash
+
+Some of the tracks are duplicates of each other. To enable detecting these in the next step, we
+precompute the MD5 hash of each track:
+
+```
+find audio -name '*.mp3' | parallel -j 64 md5sum > audio/md5sums.txt
+```
+
+This is a very crude method for deduplication, since it will only find exact reuploads (with
+identical MP3 metadata). However, it already finds quite a lot of duplicates.
+
+### 4 Finalize Dataset Creation
+
+Sample the train/dev/test split over deduplicated files, and write the metadata JSON file.
+
+The metadata is just a dictionary mapping from the track ID to the raw track metadata as it was
+returned by the SoundCloud API. We only add the key `scdata_split` field to each metadata, which
+has as its value either "train", "dev", or "test".
+
+```
+tools/finalize.py \
+    --crawler_state crawler_state.json \
+    --out_file scdata.json \
+    --checksum_file audio/md5sums.txt \
+    | tee logs/finalize.log
+```

@@ -172,7 +172,8 @@ class SoundCloudCrawler:
         complete_nodl_perc = complete_nodl_count / len(self.tracks) * 100
 
         print('=================================================================================')
-        print(f'#api_calls:           {self.api.get_num_calls()}')
+        if self.api:
+            print(f'#api_calls:           {self.api.get_num_calls()}')
         print(f'#visited_tracks:      {len(self.visited_tracks)}')
         print(f'#visited_playlists:   {len(self.visited_playlists)}')
         print(f'#visited_users:       {len(self.visited_users)}')

@@ -1,4 +1,5 @@
 Arguments: {
+    "audio_dir": "audio",
     "crawler_state": "crawler_state.json",
     "out_file": "scdata.json",
     "p_dev": 0.05,
@@ -31,6 +32,6 @@ licenses:             [('all-rights-reserved', 1197565), ('cc-by-nc-sa', 55908),
 =================================================================================
 Finished loading crawler state
 Genre counts: [('electronic', 4012), ('hip-hop & rap', 3170), ('house', 2562), ('deep house', 2338), ('dance & edm', 2044), ('techno', 1401), ('drum & bass', 1357), ('dubstep', 1253), ('trap', 1203), ('ambient', 1173), ('pop', 1058), ('soundtrack', 1039), ('trance', 1013), ('disco', 901), ('mashup', 738), ('progressive house', 695), ('r&b & soul', 651), ('funk', 643), ('jazz & blues', 578), ('piano', 479), ('chiptune', 476), ('world', 461), ('nightcore', 444), ('chillout', 442), ('alternative rock', 440), ('dancehall', 439), ('reggae', 438), ('rock', 399), ('dub', 353), ('classical', 320), ('trip-hop', 268), ('indie rock', 257), ('instrumental', 247), ('lofi', 242), ('tropical house', 241), ('folk & singer-songwriter', 222), ('beats', 161), ('psytrance', 161), ('chillstep', 145), ('synthwave', 129), ('downtempo', 129), ('metal', 107), ('orchestral', 106), ('experimental', 100), ('latin', 97), ('progressive trance', 74), ('acoustic', 67), ('minimal', 67), ('country', 67), ('drumstep', 54), ('cinematic', 42), ('gospel', 15), ('urban', 8)]
-Ignored 491 tracks from rare genres
-Split counts: Counter({'train': 31483, 'dev': 1785, 'test': 1767})
+Ignored 514 tracks from rare genres
+Split counts: Counter({'train': 31462, 'dev': 1785, 'test': 1765})
 Writing metadata JSON to "scdata.json"

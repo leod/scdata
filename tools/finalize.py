@@ -7,6 +7,10 @@ import argparse
 import os
 import json
 from collections import defaultdict, Counter
+from io import BytesIO
+
+import PIL.Image
+from mutagen.id3 import ID3
 
 from numpy import random
 
@@ -58,7 +62,8 @@ def sample_unique(tracks_by_checksum):
     return unique_tracks
 
 
-def finalize_dataset(crawler_state,
+def finalize_dataset(audio_dir,
+                     crawler_state,
                      out_file,
                      p_dev,
                      p_test,
@@ -92,6 +97,14 @@ def finalize_dataset(crawler_state,
     filtered_tracks = []
     for track_id in unique_tracks:
         track_info = crawler.tracks[track_id]
+
+        # A couple of tracks seem to have bad image data.
+        try:
+            tags = ID3(get_audio_path(audio_dir, track_info['id']))
+            PIL.Image.open(BytesIO(tags.getall('APIC')[0].data))
+        except:
+            continue
+
         if num_tracks_by_genre[map_genre(track_info['genre'])] >= min_tracks_per_genre:
             filtered_tracks.append(track_info)
             #tracks_by_user[track_info['user_id']].append(track_info)
@@ -126,6 +139,9 @@ def finalize_dataset(crawler_state,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--audio_dir',
+                        help='Directory that contains the MP3 audio files',
+                        required=True)
     parser.add_argument('--crawler_state',
                         help='Path of the crawler state JSON, as written by crawl.py',
                         required=True)

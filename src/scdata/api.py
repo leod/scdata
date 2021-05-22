@@ -5,7 +5,6 @@ from urllib.parse import quote
 
 import aiohttp
 import aiohttp.web
-import asyncio
 
 import mutagen
 from mutagen.id3 import ID3, TIT2, COMM, TCON, TDRC, APIC, TPE1

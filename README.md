@@ -35,7 +35,7 @@ Track metadata is stored in a single file called `scdata.json`. Example usage:
 import json
 
 with open('scdata.json') as f:
-   scdata = json.load(f)
+   scdata_meta = json.load(f)
 
 # TODO
 ```

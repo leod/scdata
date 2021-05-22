@@ -9,7 +9,7 @@ import random
 import json
 from collections import defaultdict, Counter
 
-from scdata import SoundCloudAPI, SoundCloudCrawler
+from scdata import SoundCloudAPI, SoundCloudCrawler, map_genre
 from scdata.load import get_audio_path
 
 
@@ -57,7 +57,13 @@ def sample_unique(tracks_by_checksum):
     return unique_tracks
 
 
-def finalize_dataset(crawler_state, out_file, p_dev, p_test, checksum_file, seed):
+def finalize_dataset(crawler_state,
+                     out_file,
+                     p_dev,
+                     p_test,
+                     checksum_file,
+                     min_tracks_per_genre,
+                     seed):
     random.seed(args.seed)
 
     print(f'Loading track MP3 checksums from "{checksum_file}"')
@@ -66,24 +72,35 @@ def finalize_dataset(crawler_state, out_file, p_dev, p_test, checksum_file, seed
 
     print(f'Sampled {len(unique_tracks)} unique tracks out of {num_checksum_tracks}')
 
+    # Load track metadata from crawler state.
     print(f'Loading crawler state from "{crawler_state}"')
-
     crawler = SoundCloudCrawler(api=None)
     crawler.load_state(crawler_state)
     crawler.print_info()
-
     print('Finished loading crawler state')
+
+    # Count tracks per genre to filter out rare genres.
+    num_tracks_by_genre = Counter()
+    for track_id in unique_tracks:
+        track_info = crawler.tracks[track_id]
+        num_tracks_by_genre[map_genre(track_info['genre'])] += 1
+    print(f'Genre counts: {num_tracks_by_genre.most_common()}')
 
     # Group tracks by user in preparation for train/dev/test split.
     tracks = {}
     tracks_by_user = defaultdict(list)
+    num_ignored = 0
     for track_id in unique_tracks:
         track_info = crawler.tracks[track_id]
-        tracks[track_id] = track_info
-        tracks_by_user[track_info['user_id']].append(track_info)
+        if num_tracks_by_genre[map_genre(track_info['genre'])] >= min_tracks_per_genre:
+            tracks[track_id] = track_info
+            tracks_by_user[track_info['user_id']].append(track_info)
+        else:
+            num_ignored += 1
 
     print(f'Found users: {len(tracks_by_user)}')
-    print(f'Tracks per user: {len(unique_tracks)/len(tracks_by_user):.4f}')
+    print(f'Tracks per user: {len(tracks)/len(tracks_by_user):.4f}')
+    print(f'Ignored {num_ignored} tracks from rare genres')
 
     # Perform the train/dev/test split.
     assert p_test > 0.0
@@ -132,6 +149,10 @@ if __name__ == '__main__':
     parser.add_argument('--checksum_file',
                         help='File computing the checksums precomputed for each track',
                         required=True)
+    parser.add_argument('--min_tracks_per_genre',
+                        help='Minimum number of tracks per genre',
+                        default=100,
+                        type=int)
     parser.add_argument('--seed',
                         help='Random seed',
                         default=43,

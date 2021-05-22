@@ -18,14 +18,14 @@ a Creative Commens license, or with no rights reserved. For each MP3 track, the 
 metadata as it was returned by the SoundCloud API. Furthermore, every track in the dataset has a
 cover image.
 
-The dataset has been split into a train set (32651 tracks), a dev set (1665 tracks), and a test set
-(1210 tracks).
+The dataset has been split into a train set (31483 tracks), a dev set (1785 tracks), and a test set
+(1767 tracks).
 
 Genres can be arbitrarily specified on SoundCloud. Here, we normalize genres according to a
 hand-defined (and likely flawed in some sense) genre list. For more details, please refer to
 [`genre.py`](src/scdata/genre.py). The dataset consists only of tracks whose normalized genre is part
 of this list. The dataset metadata still contains the raw genre, so the genre normalization can be
-redefined.
+redefined. The following figure shows the genre distribution of the training data.
 
 ## Usage
 

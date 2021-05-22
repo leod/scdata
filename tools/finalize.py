@@ -5,9 +5,10 @@ Finalize dataset creation and write JSON file with metadata.
 
 import argparse
 import os
-import random
 import json
 from collections import defaultdict, Counter
+
+from numpy import random
 
 from scdata import SoundCloudAPI, SoundCloudCrawler, map_genre
 from scdata.load import get_audio_path
@@ -86,47 +87,40 @@ def finalize_dataset(crawler_state,
         num_tracks_by_genre[map_genre(track_info['genre'])] += 1
     print(f'Genre counts: {num_tracks_by_genre.most_common()}')
 
-    # Group tracks by user in preparation for train/dev/test split.
-    tracks = {}
-    tracks_by_user = defaultdict(list)
-    num_ignored = 0
+    # Filter tracks:
+    #tracks_by_user = defaultdict(list)
+    filtered_tracks = []
     for track_id in unique_tracks:
         track_info = crawler.tracks[track_id]
         if num_tracks_by_genre[map_genre(track_info['genre'])] >= min_tracks_per_genre:
-            tracks[track_id] = track_info
-            tracks_by_user[track_info['user_id']].append(track_info)
-        else:
-            num_ignored += 1
+            filtered_tracks.append(track_info)
+            #tracks_by_user[track_info['user_id']].append(track_info)
 
-    print(f'Found users: {len(tracks_by_user)}')
-    print(f'Tracks per user: {len(tracks)/len(tracks_by_user):.4f}')
-    print(f'Ignored {num_ignored} tracks from rare genres')
+    #print(f'Found users: {len(tracks_by_user)}')
+    #print(f'Tracks per user: {len(filtered_tracks)/len(tracks_by_user):.4f}')
+    print(f'Ignored {len(unique_tracks) - len(filtered_tracks)} tracks from rare genres')
 
     # Perform the train/dev/test split.
     assert p_test > 0.0
     assert p_dev > 0.0
     assert p_dev + p_test < 1.0
 
+    splits = random.choice(['train', 'dev', 'test'],
+                           len(filtered_tracks),
+                           p=[1.0 - p_dev - p_test, p_dev, p_test])
+
     split_counts = Counter()
 
-    for user_tracks in tracks_by_user.values():
-        x = random.random()
-        if x < p_dev:
-            split = 'dev'
-        elif x < p_dev + p_test:
-            split = 'test'
-        else:
-            split = 'train'
-
-        for track in user_tracks:
-            track['scdata_split'] = split
-            split_counts[split] += 1
+    for split, track_info in zip(splits, filtered_tracks):
+        track_info['scdata_split'] = split
+        split_counts[split] += 1
 
     print(f'Split counts: {split_counts}')
 
     # Write metadata file.
     print(f'Writing metadata JSON to "{args.out_file}"')
     with open(out_file, 'w') as f:
+        tracks = {track_info['id']: track_info for track_info in filtered_tracks}
         json.dump(tracks, f, indent=4)
 
 

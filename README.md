@@ -25,7 +25,11 @@ Genres can be arbitrarily specified on SoundCloud. Here, we normalize genres acc
 hand-defined (and likely flawed in some sense) genre list. For more details, please refer to
 [`genre.py`](src/scdata/genre.py). The dataset consists only of tracks whose normalized genre is part
 of this list. The dataset metadata still contains the raw genre, so the genre normalization can be
-redefined. The following figure shows the genre distribution of the training data.
+redefined. The following figure shows the genre distribution of the training data. The genre
+distribution is quite imbalanced as a large portion of the dataset's tracks are in an electronic
+genre.
+
+![Genre Distribution of Training Data](docs/genre_distribution_train.png)
 
 ## Usage
 

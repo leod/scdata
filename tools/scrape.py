@@ -41,7 +41,7 @@ async def main(crawler_state, out_audio_dir, config):
         missing_tracks = []
         for track_info in tracks:
             audio_path = get_audio_path(out_audio_dir, track_info['id'])
-            if not os.path.exists(audio_path):
+            if not os.path.exists(audio_path) or os.path.getsize(audio_path) == 0:
                 missing_tracks.append((track_info, audio_path))
 
         print(f'Missing tracks: {len(missing_tracks)}')

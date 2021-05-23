@@ -99,19 +99,28 @@ def finalize_dataset(audio_dir,
         track_info = crawler.tracks[track_id]
 
         # A couple of tracks seem to have bad image data.
+        audio_path = get_audio_path(audio_dir, track_info['id'])
         try:
-            tags = ID3(get_audio_path(audio_dir, track_info['id']))
+            tags = ID3(audio_path)
             PIL.Image.open(BytesIO(tags.getall('APIC')[0].data))
         except:
             continue
 
-        if num_tracks_by_genre[map_genre(track_info['genre'])] >= min_tracks_per_genre:
-            filtered_tracks.append(track_info)
-            #tracks_by_user[track_info['user_id']].append(track_info)
+        if num_tracks_by_genre[map_genre(track_info['genre'])] < min_tracks_per_genre:
+            continue
+
+        if track_info['duration'] < 10000:
+            continue
+
+        if os.path.getsize(audio_path) < 1000:
+            continue
+
+        filtered_tracks.append(track_info)
+        #tracks_by_user[track_info['user_id']].append(track_info)
 
     #print(f'Found users: {len(tracks_by_user)}')
     #print(f'Tracks per user: {len(filtered_tracks)/len(tracks_by_user):.4f}')
-    print(f'Ignored {len(unique_tracks) - len(filtered_tracks)} tracks from rare genres')
+    print(f'Ignored {len(unique_tracks) - len(filtered_tracks)} tracks')
 
     # Perform the train/dev/test split.
     assert p_test > 0.0

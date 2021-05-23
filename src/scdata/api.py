@@ -73,7 +73,6 @@ class SoundCloudAPI:
         tags['APIC'] = APIC(encoding=3, mime='image/jpeg', type=3, desc='Cover', data=artwork)
         tags.save(filename, v1=2)
          
-
     async def resolve(self, soundcloud_url: str):
         return await self.get('resolve', {'url': soundcloud_url})
 

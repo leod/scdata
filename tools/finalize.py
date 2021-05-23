@@ -118,7 +118,7 @@ def finalize_dataset(audio_dir,
     assert p_dev > 0.0
     assert p_dev + p_test < 1.0
 
-    splits = random.choice(['train', 'dev', 'test'],
+    splits = random.choice(['training', 'validation', 'test'],
                            len(filtered_tracks),
                            p=[1.0 - p_dev - p_test, p_dev, p_test])
 

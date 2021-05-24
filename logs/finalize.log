@@ -9,7 +9,7 @@ Arguments: {
     "seed": 43
 }
 Loading track MP3 checksums from "audio/md5sums.txt"
-Sampled 35526 unique tracks out of 48229
+Sampled 48139 unique tracks out of 48231
 Loading crawler state from "crawler_state.json"
 =================================================================================
 #visited_tracks:      662099
@@ -31,7 +31,7 @@ complete_nodl_tracks: [('electronic', 5265), ('hip-hop & rap', 4298), ('house', 
 licenses:             [('all-rights-reserved', 1197565), ('cc-by-nc-sa', 55908), ('cc-by', 21483), ('cc-by-nc', 8882), ('cc-by-nc-nd', 8199), ('cc-by-sa', 5163), ('cc-by-nd', 1056), ('no-rights-reserved', 474)]
 =================================================================================
 Finished loading crawler state
-Genre counts: [('electronic', 4012), ('hip-hop & rap', 3170), ('house', 2562), ('deep house', 2338), ('dance & edm', 2044), ('techno', 1401), ('drum & bass', 1357), ('dubstep', 1253), ('trap', 1203), ('ambient', 1173), ('pop', 1058), ('soundtrack', 1039), ('trance', 1013), ('disco', 901), ('mashup', 738), ('progressive house', 695), ('r&b & soul', 651), ('funk', 643), ('jazz & blues', 578), ('piano', 479), ('chiptune', 476), ('world', 461), ('nightcore', 444), ('chillout', 442), ('alternative rock', 440), ('dancehall', 439), ('reggae', 438), ('rock', 399), ('dub', 353), ('classical', 320), ('trip-hop', 268), ('indie rock', 257), ('instrumental', 247), ('lofi', 242), ('tropical house', 241), ('folk & singer-songwriter', 222), ('beats', 161), ('psytrance', 161), ('chillstep', 145), ('synthwave', 129), ('downtempo', 129), ('metal', 107), ('orchestral', 106), ('experimental', 100), ('latin', 97), ('progressive trance', 74), ('acoustic', 67), ('minimal', 67), ('country', 67), ('drumstep', 54), ('cinematic', 42), ('gospel', 15), ('urban', 8)]
-Ignored 515 tracks
-Split counts: Counter({'training': 31462, 'validation': 1785, 'test': 1764})
+Genre counts: [('electronic', 5245), ('hip-hop & rap', 4288), ('house', 3489), ('deep house', 3204), ('dance & edm', 2940), ('techno', 2450), ('drum & bass', 1977), ('dubstep', 1899), ('trap', 1739), ('ambient', 1409), ('pop', 1403), ('trance', 1362), ('soundtrack', 1258), ('disco', 1118), ('funk', 1052), ('mashup', 1006), ('progressive house', 846), ('r&b & soul', 825), ('world', 727), ('alternative rock', 664), ('jazz & blues', 662), ('nightcore', 593), ('reggae', 572), ('chiptune', 560), ('piano', 551), ('dancehall', 536), ('chillout', 510), ('rock', 509), ('dub', 430), ('classical', 361), ('indie rock', 336), ('psytrance', 315), ('trip-hop', 310), ('instrumental', 280), ('lofi', 278), ('folk & singer-songwriter', 276), ('tropical house', 260), ('beats', 184), ('downtempo', 183), ('synthwave', 180), ('chillstep', 175), ('progressive trance', 167), ('latin', 164), ('metal', 133), ('experimental', 128), ('minimal', 116), ('orchestral', 115), ('country', 108), ('acoustic', 89), ('drumstep', 70), ('cinematic', 53), ('gospel', 22), ('urban', 12)]
+Ignored 281 tracks
+Split counts: Counter({'training': 43036, 'validation': 2497, 'test': 2325})
 Writing metadata JSON to "scdata.json"

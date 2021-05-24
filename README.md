@@ -13,13 +13,13 @@ pip install -e .
 
 ## Overview
 
-The dataset was created in April 2020. It consists of 34423 tracks that were uploaded either under
+The dataset was created in April 2020. It consists of 47858 tracks that were uploaded either under
 a Creative Commens license, or with no rights reserved. For each MP3 track, the dataset has the full
 metadata as it was returned by the SoundCloud API. Furthermore, every track in the dataset has a
 cover image.
 
-The dataset has been split into a train set (31462 tracks), a dev set (1785 tracks), and a test set
-(1765 tracks).
+The dataset has been split into a train set (43036 tracks), a dev set (2497 tracks), and a test set
+(2325 tracks).
 
 Genres can be arbitrarily specified on SoundCloud. Here, we normalize genres according to a
 hand-defined (and likely flawed in some sense) genre list. For more details, please refer to

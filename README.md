@@ -18,8 +18,8 @@ a Creative Commens license, or with no rights reserved. For each MP3 track, the 
 metadata as it was returned by the SoundCloud API. Furthermore, every track in the dataset has a
 cover image.
 
-The dataset has been split into a train set (43036 tracks), a dev set (2497 tracks), and a test set
-(2325 tracks).
+The dataset has been split into a train set (26841 tracks), a dev set (1515 tracks), and a test set
+(1503 tracks).
 
 Genres can be arbitrarily specified on SoundCloud. Here, we normalize genres according to a
 hand-defined (and likely flawed in some sense) genre list. For more details, please refer to
@@ -141,6 +141,29 @@ find audio -name '*.mp3' | parallel -j 64 md5sum > audio/md5sums.txt
 This is a very crude method for deduplication, since it will only find exact reuploads (with
 identical MP3 metadata). However, it already finds quite a lot of duplicates.
 
+#### Dedupe Cover Only
+
+Alternatively, we can dedupe according to the cover only. This will detect more dupilcates.
+
+For this, first install the rust tool [`id3-image`](https://lib.rs/crates/id3-image). Then, run
+```
+find audio -name '*.mp3' | xargs -L 1 -P 32 id3-image-extract
+```
+to extract images from the songs. The `.jpg` files will be placed next to the `.mp3` files in the
+`audio` subdirectories. Extraction may fail for tracks with invalid or missing cover images. This
+is not a problem if it only happens for a few hundred tracks. Compare the counts like this:
+```
+$ find audio -name '*.jpg' | wc -l
+48107
+$ find audio -name '*.mp3' | wc -l
+48231
+```
+
+Next, precompute the MD5 hash of each image:
+```
+find audio -name '*.mp3' | parallel -j 64 md5sum > audio/md5sums.covers.txt
+```
+
 ### 4 Finalize Dataset Creation
 
 Sample the train/dev/test split over deduplicated files, and write the metadata JSON file.
@@ -151,8 +174,13 @@ has as its value either "train", "dev", or "test".
 
 ```
 tools/finalize.py \
+    --audio_dir audio \
     --crawler_state crawler_state.json \
     --out_file scdata.json \
     --checksum_file audio/md5sums.txt \
     | tee logs/finalize.log
 ```
+
+This command also removes songs that are too short (fewer than 10 seconds), or too long (more than
+15 minutes). Surprisingly, quite a lot of the songs are longer than 15 minutes: more than 10k out
+of 50k tracks. This could be because a disproportionate number of free tracks are mixes.

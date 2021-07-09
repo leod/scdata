@@ -1,0 +1,37 @@
+Arguments: {
+    "audio_dir": "audio",
+    "crawler_state": "crawler_state.json",
+    "out_file": "scdata.dedupe_covers.json",
+    "p_dev": 0.05,
+    "p_test": 0.05,
+    "checksum_file": "audio/md5sums.covers.txt",
+    "min_tracks_per_genre": 100,
+    "seed": 43
+}
+Loading track MP3 checksums from "audio/md5sums.covers.txt"
+Sampled 42990 unique tracks out of 48107
+Loading crawler state from "crawler_state.json"
+=================================================================================
+#visited_tracks:      662099
+#visited_playlists:   19600
+#visited_users:       36511
+#candidate_playlists: 409783
+#tracks:              1298730
+    #free:            101165 (7.79%)
+    #ignore_genre:    10297 (0.79%)
+    #other_genre:     512358 (39.45%)
+    #complete:        13097 (1.01%)
+    #complete_nodl:   48610 (3.74%)
+genres:               others 39.45%, unknown 14.76%, hip-hop & rap 5.21%, electronic 4.39%, house 2.79%, techno 2.72%, dance & edm 2.66%, dubstep 2.34%, drum & bass 2.22%, deep house 2.08%, pop 1.47%, trance 1.31%, trap 1.28%, reggae 1.14%, alternative rock 1.09%, r&b & soul 1.05%, ambient 0.95%, funk 0.85%, ignore 0.79%, soundtrack 0.78%, disco 0.75%, dancehall 0.72%, rock 0.72%, nightcore 0.67%, jazz & blues 0.58%, psytrance 0.58%, indie rock 0.57%, progressive house 0.55%, world 0.50%, mashup 0.45%, piano 0.40%, classical 0.40%, chillout 0.37%, folk & singer-songwriter 0.34%, dub 0.31%, progressive trance 0.27%, chiptune 0.21%, metal 0.21%, instrumental 0.21%, lofi 0.18%, minimal 0.17%, trip-hop 0.17%, synthwave 0.16%, downtempo 0.15%, latin 0.14%, country 0.14%, acoustic 0.14%, beats 0.11%, experimental 0.09%, drumstep 0.09%, chillstep 0.07%, orchestral 0.07%, tropical house 0.07%, gospel 0.04%, urban 0.04%, cinematic 0.04%
+genres_free:          others 40.80%, unknown 7.27%, electronic 5.43%, hip-hop & rap 4.41%, house 3.53%, deep house 3.22%, dance & edm 3.00%, techno 2.48%, drum & bass 2.00%, dubstep 1.99%, ignore 1.84%, trap 1.77%, trance 1.64%, ambient 1.48%, pop 1.46%, soundtrack 1.35%, funk 1.19%, disco 1.12%, mashup 1.06%, progressive house 0.86%, r&b & soul 0.85%, world 0.76%, jazz & blues 0.71%, alternative rock 0.69%, nightcore 0.65%, chiptune 0.64%, piano 0.59%, reggae 0.59%, rock 0.55%, dancehall 0.54%, chillout 0.53%, dub 0.45%, classical 0.39%, indie rock 0.35%, instrumental 0.33%, psytrance 0.32%, trip-hop 0.31%, folk & singer-songwriter 0.29%, lofi 0.28%, tropical house 0.26%, beats 0.19%, synthwave 0.18%, downtempo 0.18%, chillstep 0.18%, progressive trance 0.17%, latin 0.17%, metal 0.15%, orchestral 0.14%, experimental 0.14%, minimal 0.13%, country 0.12%, acoustic 0.11%, drumstep 0.07%, cinematic 0.06%, gospel 0.02%, urban 0.01%
+ignore_genres:        [('Remix', 2504), ('Music', 1515), ('Storytelling', 1502), ('Cover', 813), ('Podcast', 729), ('remix', 616), ('VlogMusic', 417), ('music', 389), ('Free Download', 366), ('cover', 346)]
+other_genres:         [('Tech House', 3259), ('Reggaeton', 1915), ('Future Bass', 1831), ('Bass', 1785), ('Progressive', 1541), ('Anime', 1484), ('Hardstyle', 1319), ('Psychedelic', 1295), ('Bhangra', 1158), ('Hardcore', 1136)]
+complete_tracks:      [('electronic', 1455), ('techno', 1234), ('hip-hop & rap', 833), ('deep house', 762), ('house', 701), ('dubstep', 678), ('trance', 648), ('pop', 632), ('ambient', 595), ('drum & bass', 567), ('trap', 347), ('dance & edm', 345), ('progressive house', 304), ('funk', 300), ('soundtrack', 299), ('chiptune', 280), ('piano', 227), ('disco', 226), ('alternative rock', 225), ('world', 165), ('chillout', 163), ('reggae', 155), ('dancehall', 149), ('classical', 139), ('rock', 135), ('r&b & soul', 131), ('psytrance', 129), ('jazz & blues', 111), ('mashup', 111), ('dub', 101), ('indie rock', 89), ('instrumental', 87), ('lofi', 79), ('trip-hop', 64), ('synthwave', 64), ('experimental', 63), ('downtempo', 59), ('chillstep', 56), ('orchestral', 53), ('folk & singer-songwriter', 50), ('nightcore', 42), ('latin', 38), ('beats', 33), ('metal', 32), ('progressive trance', 29), ('tropical house', 27), ('acoustic', 26), ('minimal', 21), ('country', 14), ('drumstep', 10), ('cinematic', 8), ('urban', 4), ('gospel', 2)]
+complete_nodl_tracks: [('electronic', 5265), ('hip-hop & rap', 4298), ('house', 3510), ('deep house', 3223), ('dance & edm', 2979), ('techno', 2463), ('drum & bass', 1977), ('dubstep', 1908), ('trap', 1744), ('trance', 1624), ('ambient', 1412), ('pop', 1409), ('soundtrack', 1260), ('disco', 1119), ('funk', 1058), ('mashup', 1012), ('progressive house', 849), ('r&b & soul', 835), ('world', 744), ('alternative rock', 665), ('jazz & blues', 662), ('nightcore', 593), ('reggae', 572), ('chiptune', 560), ('piano', 551), ('dancehall', 537), ('chillout', 510), ('rock', 510), ('dub', 430), ('classical', 361), ('indie rock', 337), ('psytrance', 315), ('trip-hop', 310), ('instrumental', 281), ('lofi', 279), ('folk & singer-songwriter', 277), ('tropical house', 262), ('beats', 184), ('downtempo', 183), ('synthwave', 181), ('chillstep', 175), ('progressive trance', 169), ('latin', 165), ('metal', 133), ('experimental', 128), ('minimal', 118), ('orchestral', 116), ('country', 108), ('acoustic', 90), ('drumstep', 70), ('cinematic', 53), ('gospel', 23), ('urban', 13)]
+licenses:             [('all-rights-reserved', 1197565), ('cc-by-nc-sa', 55908), ('cc-by', 21483), ('cc-by-nc', 8882), ('cc-by-nc-nd', 8199), ('cc-by-sa', 5163), ('cc-by-nd', 1056), ('no-rights-reserved', 474)]
+=================================================================================
+Finished loading crawler state
+Genre counts: [('electronic', 4869), ('hip-hop & rap', 3396), ('house', 3372), ('deep house', 3095), ('dance & edm', 2740), ('techno', 2337), ('dubstep', 1690), ('trap', 1670), ('drum & bass', 1576), ('ambient', 1269), ('trance', 1131), ('disco', 1087), ('soundtrack', 1017), ('mashup', 925), ('funk', 907), ('pop', 885), ('progressive house', 785), ('r&b & soul', 774), ('world', 694), ('jazz & blues', 627), ('alternative rock', 586), ('nightcore', 582), ('dancehall', 502), ('rock', 482), ('reggae', 479), ('chillout', 475), ('piano', 462), ('chiptune', 462), ('dub', 331), ('indie rock', 314), ('classical', 277), ('psytrance', 276), ('lofi', 273), ('tropical house', 255), ('instrumental', 245), ('folk & singer-songwriter', 224), ('trip-hop', 209), ('chillstep', 168), ('downtempo', 167), ('synthwave', 154), ('latin', 153), ('beats', 147), ('progressive trance', 142), ('metal', 127), ('experimental', 114), ('minimal', 111), ('orchestral', 106), ('country', 104), ('acoustic', 73), ('drumstep', 66), ('cinematic', 49), ('gospel', 17), ('urban', 12)]
+Ignored 13131 tracks
+Split counts: Counter({'training': 26841, 'test': 1515, 'validation': 1503})
+Writing metadata JSON to "scdata.dedupe_covers.json"

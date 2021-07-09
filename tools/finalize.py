@@ -52,7 +52,7 @@ def sample_unique(tracks_by_checksum):
     Select one track from each group of tracks that has the same checksum.
 
     While the MP3 files are identical, the metadata as returned by the SoundCloud API could still
-    be differerent, so we need choose one representative per group.
+    be different, so we need choose one representative per group.
     """
     unique_tracks = []
 
@@ -110,6 +110,9 @@ def finalize_dataset(audio_dir,
             continue
 
         if track_info['duration'] < 10000:
+            continue
+
+        if track_info['duration'] > 900000:
             continue
 
         if os.path.getsize(audio_path) < 1000:

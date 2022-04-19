@@ -170,7 +170,7 @@ Sample the train/dev/test split over deduplicated files, and write the metadata 
 
 The metadata is just a dictionary mapping from the track ID to the raw track metadata as it was
 returned by the SoundCloud API. We only add the key `scdata_split` field to each metadata, which
-has as its value either "train", "dev", or "test".
+has as its value either "training", "validation", or "test".
 
 ```
 tools/finalize.py \

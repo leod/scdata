@@ -13,7 +13,7 @@ pip install -e .
 
 ## Overview
 
-The dataset was created in April 2020. It consists of 47858 tracks that were uploaded either under
+The dataset was created in April 2021. It consists of 47858 tracks that were uploaded either under
 a Creative Commens license, or with no rights reserved. For each MP3 track, the dataset has the full
 metadata as it was returned by the SoundCloud API. Furthermore, every track in the dataset has a
 cover image.

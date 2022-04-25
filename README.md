@@ -143,7 +143,7 @@ identical MP3 metadata). However, it already finds quite a lot of duplicates.
 
 #### Dedupe Cover Only
 
-Alternatively, we can dedupe according to the cover only. This will detect more dupilcates.
+Alternatively, we can dedupe according to the cover only. This will detect more duplicates.
 
 For this, first install the rust tool [`id3-image`](https://lib.rs/crates/id3-image). Then, run
 ```
